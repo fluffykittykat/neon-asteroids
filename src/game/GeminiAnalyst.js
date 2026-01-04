@@ -2,8 +2,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export class GeminiAnalyst {
     constructor() {
-        // Use user-provided key OR local storage
-        this.apiKey = localStorage.getItem('gemini_api_key') || "AIzaSyA-ZwecWHk8U-7aTvXkWmbrMgfNphiO-N0";
+        // Use user-provided key OR environment variable OR local storage
+        this.apiKey = localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || window.env?.VITE_GEMINI_API_KEY;
         this.genAI = null;
         this.model = null;
 

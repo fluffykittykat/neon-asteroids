@@ -1,10 +1,10 @@
 import { Vector2 } from './Vector2.js';
 
 export class TouchControls {
-    constructor(inputHandler, width, height) {
+    constructor(inputHandler, width, height) { // width/height args ignored now, using window
         this.input = inputHandler;
-        this.width = width;
-        this.height = height;
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
 
         // Joystick (Left)
         this.joyBase = null; // {x, y}
@@ -44,13 +44,22 @@ export class TouchControls {
     handleStart(e) {
         if (!this.active) return;
         e.preventDefault();
+
+        // Calculate Scale Factor (Canvas Pixels per Window Pixel)
+        // We assume the canvas fills the window visually.
+        const rect = e.target.getBoundingClientRect();
+        const scaleX = e.target.width / rect.width;
+        const scaleY = e.target.height / rect.height;
+
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
-            const x = t.clientX;
-            const y = t.clientY;
+            // Map Touch to Canvas Coordinates
+            const x = (t.clientX - rect.left) * scaleX;
+            const y = (t.clientY - rect.top) * scaleY;
 
-            // Left side = Joystick
-            if (x < this.width / 2) {
+            // Logic: Left half of SCREEN (not canvas) is joystick
+            // t.clientX is screen coordinate
+            if (t.clientX < window.innerWidth / 2) {
                 if (this.joyTouchId === null) {
                     this.joyTouchId = t.identifier;
                     this.joyBase = { x, y };
@@ -62,8 +71,8 @@ export class TouchControls {
             else {
                 this.isFiring = true;
                 this.fireTouchId = t.identifier;
-                // Update Fire Button Position to be under finger for comfort? 
-                // No, keep static for muscle memory.
+                // Update Fire Button Position to be under finger?
+                // For now, let's just trigger fire.
                 this.input.setFire(true);
             }
         }
@@ -72,12 +81,20 @@ export class TouchControls {
     handleMove(e) {
         if (!this.active) return;
         e.preventDefault();
+
+        const rect = e.target.getBoundingClientRect();
+        const scaleX = e.target.width / rect.width;
+        const scaleY = e.target.height / rect.height;
+
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
 
             if (t.identifier === this.joyTouchId) {
-                const dx = t.clientX - this.joyBase.x;
-                const dy = t.clientY - this.joyBase.y;
+                const x = (t.clientX - rect.left) * scaleX;
+                const y = (t.clientY - rect.top) * scaleY;
+
+                const dx = x - this.joyBase.x;
+                const dy = y - this.joyBase.y;
                 const dist = Math.hypot(dx, dy);
                 const angle = Math.atan2(dy, dx);
 
@@ -122,9 +139,9 @@ export class TouchControls {
     }
 
     resize(w, h) {
-        this.width = w;
-        this.height = h;
-        this.fireBtnPos = { x: w - 80, y: h - 80 };
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
+        this.fireBtnPos = { x: this.width - 80, y: this.height - 80 };
     }
 
     draw(ctx) {

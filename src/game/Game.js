@@ -112,6 +112,14 @@ export class Game {
             if (this.touchControls) this.touchControls.resize(this.width, this.height);
         });
 
+        // Global Audio Unlocker
+        const unlockAudio = () => {
+            if (this.audio) this.audio.resume();
+        };
+        window.addEventListener('click', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio);
+        window.addEventListener('keydown', unlockAudio);
+
         this.loop = this.loop.bind(this);
     }
 
