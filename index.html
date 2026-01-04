@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <title>Neon Asteroids</title>
+  <link rel="stylesheet" href="./style.css?v=2">
+</head>
+
+<body>
+  <div id="ui-layer">
+    <div id="hud-top">
+      <div id="score-board">SCORE: <span id="score">0</span></div>
+      <div id="high-score-board">HIGH SCORE: <span id="high-score">0</span></div>
+      <div id="lives-board">LIVES: <span id="lives">3</span></div>
+      <button id="ingame-logs-btn" class="small-btn" style="pointer-events: auto; z-index: 100; margin-left: 20px;">LOGS</button>
+    </div>
+    <div id="start-screen" class="visible">
+      <h1>ASTEROIDS</h1>
+      <p id="start-prompt">Press SPACE to Start</p>
+      <p class="controls">WASD / Arrows to Move | SPACE to Shoot</p>
+
+      <!-- AUTH UI -->
+      <button id="login-btn" class="retro-btn">LOGIN WITH GOOGLE</button>
+      <div id="user-profile" class="hidden">
+        <img id="user-avatar" src="" alt="Avatar">
+        <div class="profile-text">
+          <span id="user-name">Player</span>
+          <button id="view-logs-btn" class="small-btn">LOGS</button>
+          <button id="test-db-btn" class="small-btn" style="color: #00ff00; border-color: #00ff00;">TEST DB</button>
+        </div>
+        <button id="logout-btn" class="small-btn">LOGOUT</button>
+      </div>
+    </div>
+    <div id="game-over-screen" class="hidden">
+      <h1>GAME OVER</h1>
+      <p>Final Score: <span id="final-score">0</span></p>
+      <div class="game-over-actions">
+        <button id="view-logs-gameover-btn" class="retro-btn">MISSION LOGS</button>
+      </div>
+      <p style="margin-top: 20px;">Press SPACE to Restart</p>
+    </div>
+
+    <!-- DASHBOARD OVERLAY -->
+    <div id="dashboard-overlay" class="hidden">
+      <div id="dashboard-window">
+        <button id="close-dashboard" class="close-btn">X</button>
+        <h2>FLIGHT LOGS</h2>
+        <div id="log-list" class="scroll-pane">
+          <!-- Populated by JS -->
+        </div>
+        <div id="log-details" class="hidden">
+          <div class="detail-header">
+            <button id="back-to-list" class="small-btn">&lt; BACK</button>
+            <span id="detail-date"></span>
+          </div>
+          <div id="chat-container">
+            <div id="chat-history"></div>
+            <div id="chat-input-area">
+              <input type="text" id="chat-input" placeholder="Ask about your mission..." maxlength="60">
+              <button id="send-chat-btn">SEND</button>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-box">ACCURACY: <span id="metric-acc"></span></div>
+            <div class="stat-box">KILLS: <span id="metric-kills"></span></div>
+          </div>
+          <div id="metric-title" class="rank-title"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <canvas id="game-canvas"></canvas>
+  <script type="module" src="./main.js?v=2"></script>
+</body>
+
+</html>
