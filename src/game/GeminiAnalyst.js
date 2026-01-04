@@ -127,25 +127,8 @@ export class GeminiAnalyst {
     }
 
     async discoverBestModel() {
-        try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`);
-            const data = await response.json();
-            if (!data.models) return "gemini-1.5-flash"; // Fallback
-
-            // Priority: Flash > Pro > 1.0
-            // We look for 'generateContent' supported method if possible, but the list usually implies it.
-            const models = data.models.map(m => m.name.replace('models/', ''));
-
-            const preferred = models.find(m => m.includes('1.5-flash')) ||
-                models.find(m => m.includes('1.5-pro')) ||
-                models.find(m => m.includes('gemini-pro')) ||
-                models[0];
-
-            return preferred || "gemini-1.5-flash";
-        } catch (e) {
-            console.warn("Discovery failed, defaulting to flash:", e);
-            return "gemini-1.5-flash";
-        }
+        // Force use of a stable model to avoid 404s on deprecated/experimental endpoints
+        return "gemini-1.5-flash";
     }
 
     async generateSummary(log, userId) {
