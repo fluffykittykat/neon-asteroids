@@ -13,6 +13,6 @@
   },
   "dependencies": {
     "firebase": "^10.7.1",
-    "@google/generative-ai": "^0.12.0"
+    "@google/generative-ai": "^0.21.0"
   }
 }
