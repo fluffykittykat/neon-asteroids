@@ -145,7 +145,51 @@ export class GeminiAnalyst {
     }
 
     async discoverBestModel() {
-        return "gemini-1.5-flash-001";
+        if (!this.apiKey) return "gemini-1.5-flash"; // Fallback default
+
+        try {
+            // Fetch available models dynamically
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`);
+            const data = await response.json();
+
+            if (!data.models) {
+                console.warn("No models returned by API, using default.");
+                return "gemini-1.5-flash";
+            }
+
+            const modelNames = data.models.map(m => m.name);
+            console.log("Available Models:", modelNames);
+
+            // Priority List
+            const candidates = [
+                'models/gemini-1.5-flash',
+                'models/gemini-1.5-flash-latest',
+                'models/gemini-1.5-flash-001',
+                'models/gemini-pro',
+                'models/gemini-1.0-pro'
+            ];
+
+            // return the first match found in available models
+            for (const c of candidates) {
+                if (modelNames.includes(c)) {
+                    // Remove 'models/' prefix if the library expects just the name
+                    // The Google library usually accepts both, but let's be safe and strip 'models/' 
+                    // IF the user input usually usually doesn't have it. 
+                    // Actually, the library handles "gemini-pro" -> "models/gemini-pro" internally.
+                    // So we should return just the name part.
+                    return c.replace('models/', '');
+                }
+            }
+
+            // If no specific favourite found, pick the first one that supports generateContent
+            // (Heuristic: usually contains 'gemini')
+            const fallback = modelNames.find(m => m.includes('gemini') && !m.includes('vision'));
+            return fallback ? fallback.replace('models/', '') : "gemini-1.5-flash";
+
+        } catch (e) {
+            console.error("Failed to list models:", e);
+            return "gemini-1.5-flash";
+        }
     }
 
     async generateSummary(log, userId) {

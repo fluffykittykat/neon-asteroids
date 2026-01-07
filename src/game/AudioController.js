@@ -1,14 +1,24 @@
 export class AudioController {
     constructor() {
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = 0.3; // Default volume
-        this.masterGain.connect(this.ctx.destination);
+        this.ctx = null;
+        this.masterGain = null;
         this.enabled = true;
         this.musicIntensity = 0;
+        this.initialized = false;
+    }
+
+    init() {
+        if (this.initialized) return;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.3;
+        this.masterGain.connect(this.ctx.destination);
+        this.initialized = true;
     }
 
     resume() {
+        if (!this.initialized) this.init();
+
         if (this.ctx.state === 'suspended') {
             this.ctx.resume().catch(e => console.warn("Audio Resume Failed (User interaction needed)", e));
         }
@@ -29,6 +39,8 @@ export class AudioController {
 
     playTone(freq, type, duration, vol = 1) {
         if (!this.enabled) return;
+        if (!this.initialized) this.init();
+
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
 
@@ -261,6 +273,8 @@ export class AudioController {
 
     startMusic() {
         if (!this.enabled || this.isMusicPlaying) return;
+        if (!this.initialized) this.init();
+
         this.isMusicPlaying = true;
         this.musicIntensity = 0; // 0.0 to 1.0 (Low -> High)
         this.ctx.resume(); // Ensure context is running
