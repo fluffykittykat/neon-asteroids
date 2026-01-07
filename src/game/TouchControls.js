@@ -1,10 +1,9 @@
 import { Vector2 } from './Vector2.js';
 
 export class TouchControls {
-    constructor(inputHandler, width, height) { // width/height args ignored now, using window
+    constructor(inputHandler, width, height) {
         this.input = inputHandler;
-        this.width = window.innerWidth;
-        this.height = window.innerHeight;
+        this.resize(width, height);
 
         // Joystick (Left)
         this.joyBase = null; // {x, y}
@@ -139,9 +138,20 @@ export class TouchControls {
     }
 
     resize(w, h) {
-        this.width = window.innerWidth;
-        this.height = window.innerHeight;
-        this.fireBtnPos = { x: this.width - 80, y: this.height - 80 };
+        this.width = w;
+        this.height = h;
+
+        // Dynamic UI Scaling
+        // If the game resolution is much larger than the screen (e.g. on mobile with virtual resolution),
+        // we need to scale up the UI elements so they remain physically touchable.
+        const uiScale = w / window.innerWidth;
+
+        this.maxRadius = 50 * uiScale;
+        this.fireBtnRadius = 40 * uiScale;
+
+        this.margin = 80 * uiScale;
+
+        this.fireBtnPos = { x: this.width - this.margin, y: this.height - this.margin };
     }
 
     draw(ctx) {
@@ -167,14 +177,14 @@ export class TouchControls {
             // Stick
             ctx.fillStyle = 'rgba(0, 243, 255, 0.8)';
             ctx.beginPath();
-            ctx.arc(this.joyBase.x + this.joyStick.x, this.joyBase.y + this.joyStick.y, 20, 0, Math.PI * 2);
+            ctx.arc(this.joyBase.x + this.joyStick.x, this.joyBase.y + this.joyStick.y, 20 * (this.maxRadius / 50), 0, Math.PI * 2);
             ctx.fill();
         } else {
             // Idle: Show faint hint area
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(80, this.height - 80, this.maxRadius, 0, Math.PI * 2);
+            ctx.arc(this.margin, this.height - this.margin, this.maxRadius, 0, Math.PI * 2);
             ctx.stroke();
         }
 

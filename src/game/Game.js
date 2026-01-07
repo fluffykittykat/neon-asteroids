@@ -105,13 +105,25 @@ export class Game {
         this.setupAuth();
         this.updateUI();
 
-        window.addEventListener('resize', () => {
+        // Detect Mobile
+        this.isMobile = navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        const resize = () => {
             const maxW = 2560;
-            const scale = Math.min(1, maxW / window.innerWidth);
-            this.width = this.canvas.width = window.innerWidth * scale;
-            this.height = this.canvas.height = window.innerHeight * scale;
+            const minW = this.isMobile ? 1200 : 0; // Force "Zoom Out" on mobile by increasing resolution
+
+            let targetW = window.innerWidth;
+            if (targetW < minW) targetW = minW;
+            if (targetW > maxW) targetW = maxW;
+
+            this.width = this.canvas.width = targetW;
+            this.height = this.canvas.height = targetW * (window.innerHeight / window.innerWidth);
+
             if (this.touchControls) this.touchControls.resize(this.width, this.height);
-        });
+        };
+
+        window.addEventListener('resize', resize);
+        resize(); // Init size immediately
 
         // Global Audio Unlocker
         const unlockAudio = () => {
