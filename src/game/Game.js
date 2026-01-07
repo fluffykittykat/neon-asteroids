@@ -256,6 +256,9 @@ export class Game {
             }
 
             if (e.code === 'Space' || e.code === 'Enter') {
+                // Prevent starting game if Dashboard is visible
+                if (this.dashboard && this.dashboard.isVisible()) return;
+
                 if (this.state === 'START') {
                     this.startGame();
                 } else if (this.state === 'GAMEOVER') {
