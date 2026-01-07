@@ -119,7 +119,7 @@ export class Game {
 
         const resize = () => {
             const maxW = 2560;
-            const minW = this.isMobile ? 1200 : 0; // Force "Zoom Out" on mobile by increasing resolution
+            const minW = this.isMobile ? 900 : 0; // Moderate Zoom Out on mobile
 
             let targetW = window.innerWidth;
             if (targetW < minW) targetW = minW;

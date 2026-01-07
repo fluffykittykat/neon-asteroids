@@ -10,14 +10,21 @@ export class AudioController {
 
     resume() {
         if (this.ctx.state === 'suspended') {
-            this.ctx.resume();
+            this.ctx.resume().catch(e => console.warn("Audio Resume Failed (User interaction needed)", e));
         }
-        // Force iOS Unlock with Silent Buffer
-        const buffer = this.ctx.createBuffer(1, 1, 22050);
-        const source = this.ctx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(this.ctx.destination);
-        source.start(0);
+
+        // Force iOS Unlock with Silent Buffer (Must be inside a user event)
+        // We create an empty buffer and play it.
+        try {
+            const buffer = this.ctx.createBuffer(1, 1, 22050);
+            const source = this.ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(this.ctx.destination);
+            if (source.start) source.start(0);
+            else if (source.noteOn) source.noteOn(0); // Legacy Safari
+        } catch (e) {
+            console.error("iOS Audio Unlock Failed:", e);
+        }
     }
 
     playTone(freq, type, duration, vol = 1) {
