@@ -233,6 +233,7 @@ export class Game {
                 // Prevent duplicate click if not prevented elsewhere
             }
             this.audio.resume(); // Unlock audio context
+            this.audio.startMusic(); // START THE BEATS
 
             if (this.state === 'START') {
                 this.startGame();

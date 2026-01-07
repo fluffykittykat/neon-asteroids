@@ -250,4 +250,76 @@ export class AudioController {
             osc.stop(now + 1.0);
         }
     }
+
+    startMusic() {
+        if (!this.enabled || this.isMusicPlaying) return;
+        this.isMusicPlaying = true;
+        this.ctx.resume(); // Ensure context is running
+
+        // Cyberpunk Arpeggio Sequence
+        const sequence = [
+            110, 130.81, 146.83, 164.81, // A2, C3, D3, E3
+            110, 130.81, 146.83, 196.00  // A2, C3, D3, G3
+        ];
+        let noteIndex = 0;
+        const tempo = 0.2; // Seconds per note
+
+        const playNextNote = () => {
+            if (!this.isMusicPlaying) return;
+
+            const now = this.ctx.currentTime;
+
+            // Bass/Lead Synth
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const filter = this.ctx.createBiquadFilter();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(sequence[noteIndex], now);
+
+            // Lowpass filter for dark sci-fi feel
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(400, now);
+            filter.frequency.linearRampToValueAtTime(800, now + 0.1); // Wah effect
+            filter.frequency.linearRampToValueAtTime(400, now + tempo);
+
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.15, now + 0.05); // Fade in
+            gain.gain.linearRampToValueAtTime(0, now + tempo); // Fade out
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.masterGain);
+
+            osc.start(now);
+            osc.stop(now + tempo + 0.1);
+
+            // Sub Bass Drone (every 8 notes)
+            if (noteIndex % 8 === 0) {
+                const subOsc = this.ctx.createOscillator();
+                const subGain = this.ctx.createGain();
+                subOsc.type = 'square';
+                subOsc.frequency.setValueAtTime(55, now); // A1 (Deep)
+
+                subGain.gain.setValueAtTime(0.2, now);
+                subGain.gain.exponentialRampToValueAtTime(0.01, now + (tempo * 8));
+
+                subOsc.connect(subGain);
+                subGain.connect(this.masterGain);
+                subOsc.start(now);
+                subOsc.stop(now + (tempo * 8));
+            }
+
+            noteIndex = (noteIndex + 1) % sequence.length;
+
+            // Schedule next note
+            setTimeout(() => playNextNote(), tempo * 1000);
+        };
+
+        playNextNote();
+    }
+
+    stopMusic() {
+        this.isMusicPlaying = false;
+    }
 }
