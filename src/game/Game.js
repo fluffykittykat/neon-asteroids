@@ -286,6 +286,22 @@ export class Game {
         TelemetryService.startSession();
     }
 
+    resetStats() {
+        this.stats = {
+            thrusts: 0,
+            turns: 0,
+            panicSpins: 0,
+            closeCalls: 0,
+            timeCamping: 0,
+            shotsFired: 0,
+            hits: 0,
+            startTime: Date.now(), // Critical for duration calculation
+            asteroidColorMap: {}
+        };
+        this.accumulatedRotation = 0;
+        this.campingTimer = 0;
+    }
+
     resetGame() {
         this.lives = 3;
         this.score = 0;

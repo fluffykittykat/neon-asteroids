@@ -39,9 +39,22 @@ export const TelemetryService = {
             return;
         }
 
+        let duration = Date.now() - TelemetryService.startTime;
+
+        // Sanity Check: If duration is huge (e.g. > 1 year), it means startTime was 0.
+        // Try to recover using game stats or just fail gracefully.
+        if (duration > 31536000000) { // 1 year in ms
+            console.warn("Invalid Telemetry Duration detected (startTime was 0). Attempting recovery...");
+            if (stats && stats.startTime) {
+                duration = Date.now() - stats.startTime;
+            } else {
+                duration = 0; // Fallback
+            }
+        }
+
         const gameData = {
             timestamp: Date.now(),
-            duration: Date.now() - TelemetryService.startTime,
+            duration: duration,
             score: score,
             level: level,
             events: TelemetryService.logs, // Save the raw flight log
