@@ -5,6 +5,7 @@ export class AudioController {
         this.masterGain.gain.value = 0.3; // Default volume
         this.masterGain.connect(this.ctx.destination);
         this.enabled = true;
+        this.musicIntensity = 0;
     }
 
     resume() {
@@ -254,6 +255,7 @@ export class AudioController {
     startMusic() {
         if (!this.enabled || this.isMusicPlaying) return;
         this.isMusicPlaying = true;
+        this.musicIntensity = 0; // 0.0 to 1.0 (Low -> High)
         this.ctx.resume(); // Ensure context is running
 
         // Cyberpunk Arpeggio Sequence
@@ -262,12 +264,16 @@ export class AudioController {
             110, 130.81, 146.83, 196.00  // A2, C3, D3, G3
         ];
         let noteIndex = 0;
-        const tempo = 0.2; // Seconds per note
 
         const playNextNote = () => {
             if (!this.isMusicPlaying) return;
 
             const now = this.ctx.currentTime;
+
+            // Dynamic Variables based on Intensity
+            const intensity = this.musicIntensity || 0;
+            const tempo = 0.2 - (intensity * 0.07); // Speed up
+            const filterFreq = 400 + (intensity * 1200); // Open filter
 
             // Bass/Lead Synth
             const osc = this.ctx.createOscillator();
@@ -277,15 +283,20 @@ export class AudioController {
             osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(sequence[noteIndex], now);
 
-            // Lowpass filter for dark sci-fi feel
+            // Detune at high intensity
+            if (intensity > 0.6) {
+                osc.detune.setValueAtTime(Math.random() * 20 - 10, now);
+            }
+
+            // Lowpass filter modulation
             filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(400, now);
-            filter.frequency.linearRampToValueAtTime(800, now + 0.1); // Wah effect
-            filter.frequency.linearRampToValueAtTime(400, now + tempo);
+            filter.frequency.setValueAtTime(filterFreq, now);
+            filter.frequency.linearRampToValueAtTime(filterFreq + 400 + (intensity * 500), now + 0.1);
+            filter.frequency.linearRampToValueAtTime(filterFreq, now + tempo);
 
             gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(0.15, now + 0.05); // Fade in
-            gain.gain.linearRampToValueAtTime(0, now + tempo); // Fade out
+            gain.gain.linearRampToValueAtTime(0.15, now + 0.05);
+            gain.gain.linearRampToValueAtTime(0, now + tempo);
 
             osc.connect(filter);
             filter.connect(gain);
@@ -294,20 +305,43 @@ export class AudioController {
             osc.start(now);
             osc.stop(now + tempo + 0.1);
 
-            // Sub Bass Drone (every 8 notes)
+            // Sub Bass Drone (Deepening Intensity)
             if (noteIndex % 8 === 0) {
                 const subOsc = this.ctx.createOscillator();
                 const subGain = this.ctx.createGain();
-                subOsc.type = 'square';
-                subOsc.frequency.setValueAtTime(55, now); // A1 (Deep)
+                subOsc.type = intensity > 0.7 ? 'sawtooth' : 'square'; // Aggressive bass
+                subOsc.frequency.setValueAtTime(55, now);
 
-                subGain.gain.setValueAtTime(0.2, now);
+                const bassVol = 0.2 + (intensity * 0.15);
+                subGain.gain.setValueAtTime(bassVol, now);
                 subGain.gain.exponentialRampToValueAtTime(0.01, now + (tempo * 8));
 
                 subOsc.connect(subGain);
                 subGain.connect(this.masterGain);
                 subOsc.start(now);
                 subOsc.stop(now + (tempo * 8));
+            }
+
+            // Hi-Hat / Glitch (Added at Medium Intensity)
+            if (intensity > 0.3 && noteIndex % 2 === 0) {
+                const hatOsc = this.ctx.createOscillator();
+                const hatGain = this.ctx.createGain();
+                hatOsc.type = 'square';
+                hatOsc.frequency.setValueAtTime(8000 + (Math.random() * 2000), now); // Glitchy
+
+                hatGain.gain.setValueAtTime(intensity * 0.04, now);
+                hatGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+                const hatFilter = this.ctx.createBiquadFilter();
+                hatFilter.type = 'highpass';
+                hatFilter.frequency.value = 6000;
+
+                hatOsc.connect(hatFilter);
+                hatFilter.connect(hatGain);
+                hatGain.connect(this.masterGain);
+
+                hatOsc.start(now);
+                hatOsc.stop(now + 0.1);
             }
 
             noteIndex = (noteIndex + 1) % sequence.length;
@@ -317,6 +351,10 @@ export class AudioController {
         };
 
         playNextNote();
+    }
+
+    setMusicIntensity(val) {
+        this.musicIntensity = Math.max(0, Math.min(1, val));
     }
 
     stopMusic() {

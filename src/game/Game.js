@@ -441,6 +441,16 @@ export class Game {
 
         // --- PLAYING STATE ---
 
+        if (this.state === 'PLAYING') { // Check PLAYING state for intensity
+            let baseIntensity = Math.min(1, (this.level - 1) * 0.1); // +10% per level
+
+            // Boost intensity during chaos (lots of asteroids or visual shake)
+            if (this.shake > 5) baseIntensity += 0.2;
+            if (this.asteroids.length > 15) baseIntensity += 0.1;
+
+            this.audio.setMusicIntensity(baseIntensity);
+        }
+
         // --- PLAYING STATE ---
 
         // Update Ship
