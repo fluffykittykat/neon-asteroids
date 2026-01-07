@@ -110,9 +110,22 @@ export class GeminiAnalyst {
            - The second paragraph should offer a backhanded "compliment" or final judgement based on their history.
         `;
 
-        // Ensure model is loaded
-        if (!this.model) {
-            this.initAI();
+        if (!this.genAI) this.initAI();
+
+        // Auto-Discovery of best model if not already locked in
+        if (!this.currentModelName || !this.model) {
+            try {
+                const bestModel = await this.discoverBestModel();
+                console.log(`Auto-Discovered Model: ${bestModel}`);
+                this.currentModelName = bestModel;
+                this.model = this.genAI.getGenerativeModel({ model: bestModel });
+            } catch (e) {
+                console.error("Model discovery failed, using fallback.", e);
+                this.currentModelName = "gemini-1.5-flash";
+                if (this.genAI) {
+                    this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                }
+            }
         }
 
         try {
