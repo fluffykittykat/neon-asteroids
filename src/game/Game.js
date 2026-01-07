@@ -25,7 +25,16 @@ export class Game {
 
         this.input = new InputHandler();
         this.touchControls = new TouchControls(this.input, this.width, this.height);
-        this.dashboard = new Dashboard();
+        this.dashboard = new Dashboard((visible) => {
+            // When Dashboard opens/closes, toggle Touch Controls to prevent scrolling conflicts
+            if (this.touchControls) {
+                if (visible) {
+                    this.touchControls.setActive(false);
+                } else if (this.state === 'PLAYING') {
+                    this.touchControls.setActive(true);
+                }
+            }
+        });
         this.audio = new AudioController();
         this.ship = null;
         this.cow = null;

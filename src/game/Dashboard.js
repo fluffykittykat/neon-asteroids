@@ -4,7 +4,8 @@ import { TelemetryService } from './TelemetryService.js';
 const analyst = new GeminiAnalyst();
 
 export class Dashboard {
-    constructor() {
+    constructor(onVisibilityChange) {
+        this.onVisibilityChange = onVisibilityChange;
         // Elements are now lazy-loaded in getters or methods to ensure DOM is ready
         this.currentLog = null;
 
@@ -49,6 +50,7 @@ export class Dashboard {
         }
 
         ui.overlay.classList.remove('hidden');
+        if (this.onVisibilityChange) this.onVisibilityChange(true);
         this.loadLogs(userId);
         this.showList();
     }
@@ -56,6 +58,7 @@ export class Dashboard {
     hide() {
         const ui = this.elements;
         if (ui.overlay) ui.overlay.classList.add('hidden');
+        if (this.onVisibilityChange) this.onVisibilityChange(false);
     }
 
     showList() {
