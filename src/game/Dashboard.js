@@ -10,7 +10,10 @@ export class Dashboard {
 
         // Buttons might be outside the overlay, verify they exist
         const closeBtn = document.getElementById('close-dashboard');
-        if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
+        if (closeBtn) closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.hide();
+        });
 
         const backBtn = document.getElementById('back-to-list');
         if (backBtn) backBtn.addEventListener('click', () => this.showList());
