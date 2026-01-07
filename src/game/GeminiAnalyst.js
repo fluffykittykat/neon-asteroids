@@ -42,30 +42,59 @@ export class GeminiAnalyst {
             return await this.debugListModels();
         }
 
-        // 1. Fetch History for Context
+        if (!this.genAI) this.initAI();
+
+        // 1. Kick off History Fetch (Async)
+        const historyPromise = (async () => {
+            if (userId && window.TelemetryService) {
+                try {
+                    const { TelemetryService } = await import('./TelemetryService.js');
+                    return await TelemetryService.getHistory(userId);
+                } catch (e) {
+                    console.warn("History fetch failed:", e);
+                    return null;
+                }
+            }
+            return null;
+        })();
+
+        // 2. Kick off Model Discovery (Async)
+        const modelPromise = (async () => {
+            if (!this.currentModelName || !this.model) {
+                try {
+                    const bestModel = await this.discoverBestModel();
+                    console.log(`Auto-Discovered Model: ${bestModel}`);
+                    this.currentModelName = bestModel;
+                    this.model = this.genAI.getGenerativeModel({ model: bestModel });
+                } catch (e) {
+                    console.error("Model discovery failed, using fallback.", e);
+                    this.currentModelName = "gemini-1.5-flash";
+                    if (this.genAI) {
+                        this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    }
+                }
+            }
+        })();
+
+        // 3. Await History and Build Context
         let historyContext = "No prior records found.";
         try {
-            if (userId && window.TelemetryService) {
-                // Try to locate service globally or via import
-                // We need to import strictly if not available, but 'ask' is async so we can dynamic import.
-                const { TelemetryService } = await import('./TelemetryService.js');
-                const history = await TelemetryService.getHistory(userId); // Fetches last 10
-                if (history && history.length > 1) {
-                    const pastGames = history.filter(h => h.timestamp !== log.timestamp).slice(0, 3);
-                    const avgScore = Math.round(pastGames.reduce((a, b) => a + b.score, 0) / (pastGames.length || 1));
-                    historyContext = `
+            const history = await historyPromise;
+            if (history && history.length > 1) {
+                const pastGames = history.filter(h => h.timestamp !== log.timestamp).slice(0, 3);
+                const avgScore = Math.round(pastGames.reduce((a, b) => a + b.score, 0) / (pastGames.length || 1));
+                historyContext = `
                   Player History (Last 3 Games):
                   - Average Score: ${avgScore}
                   - Current Score: ${log.score}
                   - Trend: ${log.score > avgScore ? "Improvement (Surprisingly)" : "Regression (Typical)"}
                   `;
-                }
             }
         } catch (e) {
-            console.warn("History fetch failed:", e);
+            console.warn("History context build failed:", e);
         }
 
-        // 2. Construct Prompt inputs
+        // 4. Construct Prompt inputs
         const telemetrySummary = JSON.stringify(log.events.slice(-75)); // Increased context
         const stats = log.stats || {};
 
@@ -110,23 +139,8 @@ export class GeminiAnalyst {
            - The second paragraph should offer a backhanded "compliment" or final judgement based on their history.
         `;
 
-        if (!this.genAI) this.initAI();
-
-        // Auto-Discovery of best model if not already locked in
-        if (!this.currentModelName || !this.model) {
-            try {
-                const bestModel = await this.discoverBestModel();
-                console.log(`Auto-Discovered Model: ${bestModel}`);
-                this.currentModelName = bestModel;
-                this.model = this.genAI.getGenerativeModel({ model: bestModel });
-            } catch (e) {
-                console.error("Model discovery failed, using fallback.", e);
-                this.currentModelName = "gemini-1.5-flash";
-                if (this.genAI) {
-                    this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                }
-            }
-        }
+        // 5. Ensure Model is Ready
+        await modelPromise;
 
         try {
             const result = await this.model.generateContent(prompt);
