@@ -25,8 +25,8 @@ export class GeminiAnalyst {
     initAI() {
         try {
             this.genAI = new GoogleGenerativeAI(this.apiKey);
-            this.currentModelName = "gemini-1.5-flash-001";
-            this.model = this.genAI.getGenerativeModel({ model: this.currentModelName });
+            this.model = null; // Will be set by discovery
+            this.currentModelName = null;
         } catch (e) {
             console.error("Failed to init Gemini:", e);
         }
@@ -124,14 +124,20 @@ export class GeminiAnalyst {
 
             // Fallback Logic
             if (error.message.includes('404') || error.message.includes('not found')) {
-                console.warn("Flash model failed. Falling back to Gemini Pro...");
+                console.warn("Model not found or failed. Attempting re-discovery or fallback.");
                 try {
-                    this.currentModelName = "gemini-pro";
-                    this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
+                    // Force re-discovery of best model
+                    const bestModel = await this.discoverBestModel();
+                    console.log(`Auto-Discovered Model: ${bestModel}`);
+                    this.currentModelName = bestModel;
+                    this.model = this.genAI.getGenerativeModel({ model: bestModel });
+
+                    // Retry generating content with the newly discovered model
                     const result = await this.model.generateContent(prompt);
                     const response = await result.response;
                     return response.text();
                 } catch (fallbackError) {
+                    console.error("Model re-discovery and fallback failed:", fallbackError);
                     return `Error: Even the backup brain failed. (${fallbackError.message})`;
                 }
             }
