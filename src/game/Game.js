@@ -844,6 +844,9 @@ export class Game {
             TelemetryService.saveSession(this.user.uid, this.score, this.level, this.stats);
         }
 
+        // Reset Music Intensity
+        this.audio.setMusicIntensity(0);
+
         this.uiGameOverScreen.classList.remove('hidden');
         this.uiGameOverScreen.classList.add('visible');
         this.uiFinalScore.innerText = this.score;
