@@ -275,6 +275,13 @@ export class AudioController {
         const playNextNote = () => {
             if (!this.isMusicPlaying) return;
 
+            // If context is suspended (locked), don't try to play or it warns.
+            // Just wait and try again.
+            if (this.ctx.state === 'suspended') {
+                setTimeout(() => playNextNote(), 500);
+                return;
+            }
+
             const now = this.ctx.currentTime;
 
             // Dynamic Variables based on Intensity
