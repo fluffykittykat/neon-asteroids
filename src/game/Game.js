@@ -396,8 +396,8 @@ export class Game {
 
                         // Strength depends on amplitude and how close it is to the wave peak
                         const waveIntensity = Math.cos((dist - r.radius) / r.width * Math.PI / 2);
-                        // Multiplier tweaked: Was 0.02, now 0.3 (Massive Shockwave)
-                        force.mult(r.amplitude * 0.3 * waveIntensity);
+                        // Multiplier tweaked: Was 0.3 (Massive), now 0.05 for subtle effect
+                        force.mult(r.amplitude * 0.05 * waveIntensity);
 
                         a.vel.add(force);
 
