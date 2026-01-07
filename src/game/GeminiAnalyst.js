@@ -25,7 +25,8 @@ export class GeminiAnalyst {
     initAI() {
         try {
             this.genAI = new GoogleGenerativeAI(this.apiKey);
-            this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            this.currentModelName = "gemini-1.5-flash-001";
+            this.model = this.genAI.getGenerativeModel({ model: this.currentModelName });
         } catch (e) {
             console.error("Failed to init Gemini:", e);
         }
@@ -44,7 +45,9 @@ export class GeminiAnalyst {
         // 1. Fetch History for Context
         let historyContext = "No prior records found.";
         try {
-            if (userId) {
+            if (userId && window.TelemetryService) {
+                // Try to locate service globally or via import
+                // We need to import strictly if not available, but 'ask' is async so we can dynamic import.
                 const { TelemetryService } = await import('./TelemetryService.js');
                 const history = await TelemetryService.getHistory(userId); // Fetches last 10
                 if (history && history.length > 1) {
@@ -107,12 +110,9 @@ export class GeminiAnalyst {
            - The second paragraph should offer a backhanded "compliment" or final judgement based on their history.
         `;
 
-        // Auto-Discovery of best model if not already locked in
-        if (!this.currentModelName) {
-            const bestModel = await this.discoverBestModel();
-            console.log(`Auto-Discovered Model: ${bestModel}`);
-            this.currentModelName = bestModel;
-            this.model = this.genAI.getGenerativeModel({ model: bestModel });
+        // Ensure model is loaded
+        if (!this.model) {
+            this.initAI();
         }
 
         try {
@@ -120,17 +120,32 @@ export class GeminiAnalyst {
             const response = await result.response;
             return response.text();
         } catch (error) {
-            console.error("Gemini Error:", error);
+            console.error(`Gemini Error (${this.currentModelName}):`, error);
+
+            // Fallback Logic
+            if (error.message.includes('404') || error.message.includes('not found')) {
+                console.warn("Flash model failed. Falling back to Gemini Pro...");
+                try {
+                    this.currentModelName = "gemini-pro";
+                    this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
+                    const result = await this.model.generateContent(prompt);
+                    const response = await result.response;
+                    return response.text();
+                } catch (fallbackError) {
+                    return `Error: Even the backup brain failed. (${fallbackError.message})`;
+                }
+            }
+
             if (error.message.includes("API key")) {
                 return "Error: Invalid API Key. Please update it.";
             }
-            return `Communication Error with ${this.currentModelName}. Try /models to debug.`;
+
+            return `Communication Error with ${this.currentModelName}. Try /models to debug or check console.`;
         }
     }
 
     async discoverBestModel() {
-        // Force use of a stable model to avoid 404s on deprecated/experimental endpoints
-        return "gemini-1.5-flash";
+        return "gemini-1.5-flash-001";
     }
 
     async generateSummary(log, userId) {
