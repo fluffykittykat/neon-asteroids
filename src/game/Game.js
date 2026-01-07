@@ -396,8 +396,8 @@ export class Game {
 
                         // Strength depends on amplitude and how close it is to the wave peak
                         const waveIntensity = Math.cos((dist - r.radius) / r.width * Math.PI / 2);
-                        // Multiplier tweaked: Was 0.05, now 0.01 for VERY subtle effect
-                        force.mult(r.amplitude * 0.01 * waveIntensity);
+                        // Multiplier tweaked: Was 0.01, now 0.002 for MICRO subtle effect
+                        force.mult(r.amplitude * 0.002 * waveIntensity);
 
                         a.vel.add(force);
 
