@@ -25,7 +25,7 @@ export class GeminiAnalyst {
     initAI() {
         try {
             this.genAI = new GoogleGenerativeAI(this.apiKey);
-            this.model = this.genAI.getGenerativeModel({ model: "gemini-pro-latest" });
+            this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         } catch (e) {
             console.error("Failed to init Gemini:", e);
         }
@@ -130,7 +130,7 @@ export class GeminiAnalyst {
 
     async discoverBestModel() {
         // Force use of a stable model to avoid 404s on deprecated/experimental endpoints
-        return "gemini-pro-latest";
+        return "gemini-1.5-flash";
     }
 
     async generateSummary(log, userId) {
