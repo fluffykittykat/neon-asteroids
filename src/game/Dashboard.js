@@ -61,6 +61,11 @@ export class Dashboard {
         if (ui.logDetails) ui.logDetails.classList.add('hidden');
     }
 
+    isVisible() {
+        const ui = this.elements;
+        return ui.overlay && !ui.overlay.classList.contains('hidden');
+    }
+
     async loadLogs(userId) {
         this.currentLogUserId = userId;
         const ui = this.elements;

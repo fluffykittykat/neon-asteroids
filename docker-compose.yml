@@ -6,4 +6,6 @@ services:
     container_name: neon-asteroids
     ports:
       - "8080:8080"
+    environment:
+      - VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY:-AIzaSyB3ZlYVlL5CkPzxhoXvtuYffpS-_SluC2Q}
     restart: unless-stopped

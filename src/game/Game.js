@@ -95,7 +95,8 @@ export class Game {
         this.userProfile = document.getElementById('user-profile');
         this.userAvatar = document.getElementById('user-avatar');
         this.userName = document.getElementById('user-name');
-        this.btnTestDB = document.getElementById('test-db-btn');
+        this.userName = document.getElementById('user-name');
+        // this.btnTestDB = document.getElementById('test-db-btn'); // Removed per user request
         this.btnLogs = document.getElementById('view-logs-btn');
         this.btnLogout = document.getElementById('logout-btn');
         this.startPrompt = document.getElementById('start-prompt');
@@ -216,7 +217,8 @@ export class Game {
             if (!this.user) return; // REQUIRE LOGIN
 
             // Prevent game start if Dashboard is open
-            if (!this.dashboard.elements.overlay.classList.contains('hidden')) {
+            if (this.dashboard && this.dashboard.isVisible()) {
+                console.log("Input Blocked: Dashboard is open");
                 return;
             }
 
@@ -249,7 +251,7 @@ export class Game {
             if (!this.user) return; // REQUIRE LOGIN
 
             // Prevent game start if Dashboard is open
-            if (this.dashboard && this.dashboard.elements.overlay && !this.dashboard.elements.overlay.classList.contains('hidden')) {
+            if (this.dashboard && this.dashboard.isVisible()) {
                 return;
             }
 

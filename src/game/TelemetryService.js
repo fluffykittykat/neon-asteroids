@@ -55,7 +55,7 @@ export const TelemetryService = {
             const gamesRef = collection(userRef, "games");
             await addDoc(gamesRef, gameData);
             console.log("Telemetry Saved to Firestore!");
-            alert("Flight Log Saved to Database!"); // VISIBLE FEEDBACK
+            // alert("Flight Log Saved to Database!"); // VISIBLE FEEDBACK - Removed per user request
             return true;
         } catch (e) {
             console.error("Failed to save telemetry:", e);
