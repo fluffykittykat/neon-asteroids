@@ -360,6 +360,7 @@ p {
 
 .profile-text {
   display: flex;
+  flex-direction: column;
   gap: 10px;
   align-items: center;
 }
@@ -367,6 +368,11 @@ p {
 #user-name {
   color: var(--neon-blue);
   font-size: 18px;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .retro-btn {
