@@ -309,10 +309,15 @@ export class Game {
         this.ship = new Ship(this.width / 2, this.height / 2);
         this.ship.invulnerable = 180; // Start with shield
         this.resetStats();
-        // this.cleanUp(); // This method does not exist in the original code, so it's omitted.
+
+        // Full Cleanup
+        this.cow = null;
+        this.ripples = [];
+        this.shake = 0;
         this.asteroids = [];
         this.bullets = [];
         this.particles = [];
+
         this.spawnAsteroids(5);
         this.updateUI();
     }
