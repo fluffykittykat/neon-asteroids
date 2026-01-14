@@ -1,8 +1,10 @@
 import { InputHandler } from './InputHandler.js';
 import { Ship } from './entities/Ship.js';
 import { Asteroid } from './entities/Asteroid.js';
+import { Bullet } from './entities/Bullet.js';
 import { Particle } from './entities/Particle.js';
 import { Cow } from './entities/Cow.js';
+import { Alien } from './entities/Alien.js';
 import { Vector2 } from './Vector2.js';
 import { AudioController } from './AudioController.js';
 import { TouchControls } from './TouchControls.js';
@@ -12,16 +14,30 @@ import { Dashboard } from './Dashboard.js';
 
 export class Game {
     constructor(canvas) {
+        console.log("NEON ASTEROIDS v3.0 - ALIEN FIX");
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
 
+        // Detect Mobile Early
+        this.isMobile = navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-        // RESOLUTION CAP: Increased to 2560px (QHD) for sharpness while maintaining performance
-        const maxW = 2560;
-        const scale = Math.min(1, maxW / window.innerWidth);
+        // Define and Run Resize Logic
+        const resize = () => {
+            const maxW = 2560;
+            const minW = this.isMobile ? 900 : 0; // Moderate Zoom Out on mobile
 
-        this.width = this.canvas.width = window.innerWidth * scale;
-        this.height = this.canvas.height = window.innerHeight * scale;
+            let targetW = window.innerWidth;
+            if (targetW < minW) targetW = minW;
+            if (targetW > maxW) targetW = maxW;
+
+            this.width = this.canvas.width = targetW;
+            this.height = this.canvas.height = targetW * (window.innerHeight / window.innerWidth);
+
+            if (this.touchControls) this.touchControls.resize(this.width, this.height);
+        };
+
+        resize(); // Set initial dimensions before systems init
+        window.addEventListener('resize', resize);
 
         this.input = new InputHandler();
         this.touchControls = new TouchControls(this.input, this.width, this.height);
@@ -37,6 +53,7 @@ export class Game {
         });
         this.audio = new AudioController();
         this.ship = null;
+        this.alien = null;
         this.cow = null;
         this.asteroids = [];
         this.bullets = [];
@@ -82,6 +99,11 @@ export class Game {
             timeCamping: 0,
             shotsFired: 0,
             hits: 0,
+            aliensKilled: 0,
+            aliensSpawned: 0,
+            alienHitsTaken: 0,
+            alienShotsFired: 0,
+            alienShotsDodged: 0,
             startTime: Date.now()
         };
 
@@ -114,32 +136,16 @@ export class Game {
         this.setupAuth();
         this.updateUI();
 
-        // Detect Mobile
-        this.isMobile = navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        // Mobile and Resize logic moved to top of constructor to ensure correct entity spawning
 
-        const resize = () => {
-            const maxW = 2560;
-            const minW = this.isMobile ? 900 : 0; // Moderate Zoom Out on mobile
-
-            let targetW = window.innerWidth;
-            if (targetW < minW) targetW = minW;
-            if (targetW > maxW) targetW = maxW;
-
-            this.width = this.canvas.width = targetW;
-            this.height = this.canvas.height = targetW * (window.innerHeight / window.innerWidth);
-
-            if (this.touchControls) this.touchControls.resize(this.width, this.height);
-        };
-
-        window.addEventListener('resize', resize);
-        resize(); // Init size immediately
 
         // Global Audio Unlocker
         const unlockAudio = () => {
             if (this.audio) this.audio.resume();
         };
         window.addEventListener('click', unlockAudio);
-        window.addEventListener('touchstart', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio, { passive: true });
+        window.addEventListener('touchend', unlockAudio, { passive: true });
         window.addEventListener('keydown', unlockAudio);
 
         this.loop = this.loop.bind(this);
@@ -182,7 +188,7 @@ export class Game {
         if (this.btnLogs) {
             this.btnLogs.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (this.user) this.dashboard.show(this.user.uid);
+                if (this.user) this.dashboard.show(this.user);
             });
         }
 
@@ -192,7 +198,7 @@ export class Game {
             this.btnIngameLogs.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (this.user) {
-                    this.dashboard.show(this.user.uid);
+                    this.dashboard.show(this.user);
                     // PAUSE LOGIC is handled in update loop automatically
                 } else {
                     alert("Please Login First!");
@@ -200,6 +206,26 @@ export class Game {
             });
             // Prevent Space key from triggering game actions when button focused?
             this.btnIngameLogs.addEventListener('keydown', e => e.stopPropagation());
+        }
+
+        // End Game / Quit Button
+        this.btnEndGame = document.getElementById('end-game-btn');
+        if (this.btnEndGame) {
+            this.btnEndGame.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.endGame();
+            });
+            this.btnEndGame.addEventListener('keydown', e => e.stopPropagation());
+        }
+
+        // Pause Button
+        this.btnPause = document.getElementById('pause-btn');
+        if (this.btnPause) {
+            this.btnPause.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.togglePause();
+            });
+            this.btnPause.addEventListener('keydown', e => e.stopPropagation());
         }
 
         // Listen for State Changes
@@ -216,6 +242,9 @@ export class Game {
                 // Show Start Prompt
                 this.startPrompt.classList.remove('hidden');
                 this.startPrompt.style.display = 'block';
+
+                // Save User Profile to DB
+                TelemetryService.updateUserProfile(user);
             } else {
                 // Logged Out
                 this.btnLogin.style.display = 'inline-block';
@@ -243,10 +272,12 @@ export class Game {
                 return;
             }
 
-            if (e.target.id === 'view-logs-gameover-btn' || e.target.id === 'ingame-logs-btn') {
+            if (e.target.id === 'view-logs-gameover-btn' || e.target.id === 'ingame-logs-btn' || e.target.id === 'pause-btn') {
                 e.stopPropagation();
-                // Open Logs
-                if (this.user) this.dashboard.show(this.user.uid);
+                // Handle Log Buttons
+                if ((e.target.id === 'ingame-logs-btn' || e.target.id === 'view-logs-gameover-btn') && this.user) {
+                    this.dashboard.show(this.user);
+                }
                 return;
             }
 
@@ -254,6 +285,7 @@ export class Game {
                 // Prevent duplicate click if not prevented elsewhere
             }
             this.audio.resume(); // Unlock audio context
+            console.log("Game Start: Audio Context State", this.audio.ctx ? this.audio.ctx.state : "No Context");
             this.audio.startMusic(); // START THE BEATS
 
             if (this.state === 'START') {
@@ -268,6 +300,7 @@ export class Game {
 
         window.addEventListener('click', startAction);
         window.addEventListener('touchstart', startAction, { passive: false });
+        window.addEventListener('touchend', startAction, { passive: false });
 
         window.addEventListener('keydown', (e) => {
             if (!this.user) return; // REQUIRE LOGIN
@@ -305,6 +338,55 @@ export class Game {
         this.resetGame(); // Changed from this.reset()
         if (this.touchControls) this.touchControls.setActive(true);
         TelemetryService.startSession();
+        // Ensure not paused
+        this.isPaused = false;
+        if (this.btnPause) this.btnPause.innerText = 'PAUSE';
+
+        // Start the music!
+        this.audio.resume();
+        this.audio.startMusic();
+    }
+
+    togglePause() {
+        if (this.state !== 'PLAYING') return;
+
+        this.isPaused = !this.isPaused;
+
+        if (this.btnPause) {
+            this.btnPause.innerText = this.isPaused ? 'RESUME' : 'PAUSE';
+        }
+
+        if (this.isPaused) {
+            this.audio.stopMusic();
+        } else {
+            this.audio.startMusic();
+        }
+    }
+
+    endGame() {
+        this.state = 'START';
+        this.audio.stopMusic();
+
+        // UI Reset
+        this.uiStartScreen.classList.remove('hidden');
+        this.uiStartScreen.classList.add('visible');
+        this.uiGameOverScreen.classList.add('hidden');
+        this.uiGameOverScreen.classList.remove('visible');
+        if (this.dashboard) this.dashboard.hide();
+
+        // Clear Entities
+        this.ship = null;
+        this.asteroids = [];
+        this.bullets = [];
+        this.particles = [];
+        this.cow = null;
+        this.ripples = [];
+        this.score = 0;
+        this.updateUI();
+
+        // Regenerate decorative background asteroids?
+        // Let's just spawn a few drifting ones like a screensaver
+        this.spawnAsteroids(5);
     }
 
     resetStats() {
@@ -316,8 +398,14 @@ export class Game {
             timeCamping: 0,
             shotsFired: 0,
             hits: 0,
+            aliensKilled: 0,
+            aliensSpawned: 0,
+            alienHitsTaken: 0,
+            alienShotsFired: 0,
+            alienShotsDodged: 0,
             startTime: Date.now(), // Critical for duration calculation
-            asteroidColorMap: {}
+            asteroidColorMap: {},
+            asteroidSizeMap: { Small: 0, Medium: 0, Large: 0 }
         };
         this.accumulatedRotation = 0;
         this.campingTimer = 0;
@@ -378,15 +466,15 @@ export class Game {
         // Just waiting for user input loop logic handled in update
     }
 
-    update() {
+    update(dt) {
         // Shake decay (Always run)
         if (this.shake > 0) {
             this.shake *= 0.9;
             if (this.shake < 0.5) this.shake = 0;
         }
 
-        // PAUSE GAME IF DASHBOARD OPEN
-        if (this.dashboard && this.dashboard.elements.overlay && !this.dashboard.elements.overlay.classList.contains('hidden')) {
+        // PAUSE GAME IF DASHBOARD OPEN OR PAUSED
+        if (this.isPaused || (this.dashboard && this.dashboard.elements.overlay && !this.dashboard.elements.overlay.classList.contains('hidden'))) {
             return;
         }
 
@@ -488,7 +576,7 @@ export class Game {
 
             // 2. Turn Degrees (Approximate based on frame updates)
             if (this.input.left || this.input.right) {
-                const turnSpeed = 5; // Assuming 5 degrees per frame from Ship.js (check this value)
+                const turnSpeed = 3; // Approx 2.9 degrees (0.05 rad) per frame
                 this.stats.turns += turnSpeed;
                 this.accumulatedRotation += turnSpeed;
             } else {
@@ -506,7 +594,7 @@ export class Game {
             const center = new Vector2(this.width / 2, this.height / 2);
             const distFromCenter = Math.hypot(this.ship.pos.x - center.x, this.ship.pos.y - center.y);
             if (distFromCenter < 150) {
-                this.campingTimer += 1 / 60; // Assuming 60fps
+                this.campingTimer += dt;
                 if (this.campingTimer > 5 && Math.floor(this.campingTimer) % 5 === 0) { // Log every 5s
                     // Only log once per threshold to avoid spam? 
                     // For now just accumulate total time
@@ -517,7 +605,7 @@ export class Game {
                 }
                 this.campingTimer = 0;
             }
-            this.stats.timeCamping += (distFromCenter < 150 ? 1 / 60 : 0);
+            this.stats.timeCamping += (distFromCenter < 150 ? dt : 0);
 
             // 5. Close Calls (in Collision Loop)
         }
@@ -556,6 +644,24 @@ export class Game {
             // Audio cue for level up?
         }
 
+        // Alien Lifecycle
+        if (this.alien) {
+            this.alien.update(this.width, this.height, this.ship, this.asteroids, this.bullets, this.audio, () => {
+                this.stats.alienShotsFired++;
+                TelemetryService.logEvent('alien_fire');
+            });
+            if (this.alien.isDead) this.alien = null;
+        } else if (this.state === 'PLAYING' && Math.random() < 0.001) { // 0.1% chance to spawn alien
+            this.alien = new Alien(this.width, this.height);
+            this.stats.aliensSpawned++;
+            TelemetryService.logEvent('spawn', { type: 'alien' });
+        }
+
+        // Sync Audio Mode
+        if (this.audio && this.audio.setAlienMode) {
+            this.audio.setAlienMode(!!this.alien);
+        }
+
         // Maintain Target Density (Endless Mode)
         const targetCount = 10 + this.level * 3;
 
@@ -589,7 +695,41 @@ export class Game {
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             const b = this.bullets[i];
 
-            // Bullet vs Asteroids
+            // 1. HOSTILE BULLET vs SHIP
+            if (b.isHostile) {
+                if (this.ship && !this.ship.isDead && !this.ship.isInvulnerable) {
+                    const dist = Vector2.distance(b.pos, this.ship.pos);
+                    if (dist < this.ship.radius + b.radius) {
+                        this.playerHit();
+                        this.stats.alienHitsTaken++;
+                        TelemetryService.logEvent('damage', { source: 'alien' });
+                        b.isDead = true;
+                    }
+                }
+                continue; // Hostile bullets don't hit asteroids
+            }
+
+            // 2. FRIENDLY BULLET vs ALIEN
+            if (this.alien && !b.isHostile) {
+                const dist = Vector2.distance(b.pos, this.alien.pos);
+                if (dist < this.alien.radius + b.radius) {
+                    // Alien Killed
+                    this.createExplosion(this.alien.pos, '#00ff00', 100);
+                    // RIPPLE EFFECT ADDED
+                    this.createRipple(this.alien.pos, 300, 50);
+
+                    this.audio.explode('#00ff00', 30);
+                    this.score += 200; // Reduced from 500
+                    this.stats.aliensKilled++;
+                    TelemetryService.logEvent('kill', { target: 'alien' });
+                    this.alien = null;
+                    b.isDead = true;
+                    this.updateUI();
+                    continue;
+                }
+            }
+
+            // 3. FRIENDLY BULLET vs ASTEROIDS
             for (let j = this.asteroids.length - 1; j >= 0; j--) {
                 const a = this.asteroids[j];
                 if (a.collidesWith(b)) {
@@ -605,14 +745,50 @@ export class Game {
                         color: a.color
                     });
 
+                    // Track color and size stats
                     this.stats.asteroidColorMap = this.stats.asteroidColorMap || {};
                     this.stats.asteroidColorMap[a.color] = (this.stats.asteroidColorMap[a.color] || 0) + 1;
+
+                    this.stats.asteroidSizeMap = this.stats.asteroidSizeMap || { Small: 0, Medium: 0, Large: 0 };
+                    this.stats.asteroidSizeMap[sizeCat]++;
+
                     this.stats.hits++;
 
                     b.isDead = true;
                     this.breakAsteroid(a, j);
-                    this.score += 100 * (4 - (a.radius > 20 ? 1 : a.radius > 10 ? 2 : 3));
+
+                    // SIZE + COLOR BASED SCORING
+                    // Base score by size (smaller = harder to hit = more points)
+                    let basePoints = 150; // Small (hardest) - high reward
+                    if (a.radius > 30) basePoints = 25; // Large (easy target)
+                    else if (a.radius > 15) basePoints = 50; // Medium
+
+                    // Size multiplier for extra differentiation
+                    // Tiny asteroids (radius < 8) get bonus
+                    let sizeMultiplier = 1.0;
+                    if (a.radius < 8) sizeMultiplier = 1.5; // Tiny bonus
+                    else if (a.radius < 12) sizeMultiplier = 1.2; // Very small bonus
+
+                    // Color multiplier (Rarer colors = more points)
+                    let colorMultiplier = 1.0;
+                    const colorLower = (a.color || '').toLowerCase();
+                    if (colorLower.includes('ff00ff') || colorLower.includes('magenta') || colorLower.includes('pink')) {
+                        colorMultiplier = 2.0; // Magenta/Pink - RARE
+                    } else if (colorLower.includes('00ffff') || colorLower.includes('cyan')) {
+                        colorMultiplier = 1.8; // Cyan - Uncommon
+                    } else if (colorLower.includes('ffff00') || colorLower.includes('yellow')) {
+                        colorMultiplier = 1.5; // Yellow - Medium
+                    } else if (colorLower.includes('00ff00') || colorLower.includes('green')) {
+                        colorMultiplier = 1.2; // Green - Common+
+                    } else if (colorLower.includes('ff0000') || colorLower.includes('red')) {
+                        colorMultiplier = 1.3; // Red - Medium
+                    }
+                    // Default (other colors) = 1.0
+
+                    const pts = Math.round(basePoints * sizeMultiplier * colorMultiplier);
+                    this.score += pts;
                     this.updateUI();
+
 
                     // MEGA EXPLOSION for Bullet Impact
                     const distToShip = this.ship ? Vector2.distance(this.ship.pos, a.pos) : 1000;
@@ -862,11 +1038,12 @@ export class Game {
         }
 
         if (this.user) {
+            // Just save the session, don't auto-open logs
             TelemetryService.saveSession(this.user.uid, this.score, this.level, this.stats);
         }
 
-        // Reset Music Intensity
-        this.audio.setMusicIntensity(0);
+        // Stop Music completely
+        this.audio.stopMusic();
 
         this.uiGameOverScreen.classList.remove('hidden');
         this.uiGameOverScreen.classList.add('visible');
@@ -937,6 +1114,7 @@ export class Game {
             this.asteroids.forEach(a => a.draw(this.ctx));
             if (this.ship && !this.ship.isDead) this.ship.draw(this.ctx);
             if (this.cow) this.cow.draw(this.ctx);
+            if (this.alien) this.alien.draw(this.ctx);
             // Draw Touch Controls on top
             if (this.touchControls) this.touchControls.draw(this.ctx);
         }
@@ -1016,7 +1194,7 @@ export class Game {
         }
         this.frameCount = (this.frameCount || 0) + 1;
 
-        this.update();
+        this.update(deltaTime / 1000);
         this.draw();
 
         // Draw FPS

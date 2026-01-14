@@ -21,6 +21,10 @@
       <div id="lives-board">LIVES: <span id="lives">3</span></div>
       <button id="ingame-logs-btn" class="small-btn"
         style="pointer-events: auto; z-index: 100; margin-left: 20px;">LOGS</button>
+      <button id="pause-btn" class="small-btn"
+        style="pointer-events: auto; z-index: 100; margin-left: 10px;">PAUSE</button>
+      <button id="end-game-btn" class="small-btn"
+        style="pointer-events: auto; z-index: 100; margin-left: 10px; color: var(--neon-pink); border-color: var(--neon-pink);">QUIT</button>
     </div>
     <div id="start-screen" class="visible">
       <h1>ASTEROIDS</h1>
@@ -66,7 +70,7 @@
           <div id="chat-container">
             <div id="chat-history"></div>
             <div id="chat-input-area">
-              <input type="text" id="chat-input" placeholder="Ask about your mission..." maxlength="60">
+              <input type="text" id="chat-input" placeholder="Ask about your mission...">
               <button id="send-chat-btn">SEND</button>
             </div>
           </div>

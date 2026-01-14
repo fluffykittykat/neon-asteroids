@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, setPersistence, browserSessionPersistence } from "firebase/auth";
 
 // TODO: REPLACE THIS WITH YOUR FIREBASE CONFIG
 // Go to Firebase Console -> Project Settings -> General -> Your Apps -> SDK Setup
@@ -24,6 +24,17 @@ try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     provider = new GoogleAuthProvider();
+
+    // Force Google to always show account picker (no auto-select)
+    provider.setCustomParameters({
+        prompt: 'select_account'
+    });
+
+    // Set session persistence - user must log in each browser session
+    // This prevents auto-login after logout or page refresh
+    setPersistence(auth, browserSessionPersistence).catch((e) => {
+        console.warn("Failed to set session persistence:", e);
+    });
 } catch (e) {
     console.error("Firebase Initialization Failed (Did you add your config?):", e);
 }
@@ -48,6 +59,11 @@ export const AuthService = {
         if (!auth) return;
         try {
             await signOut(auth);
+            console.log("User signed out successfully");
+
+            // Force page reload to clear any cached state
+            // This ensures a clean slate for the next login
+            window.location.reload();
         } catch (error) {
             console.error("Logout Failed:", error);
         }

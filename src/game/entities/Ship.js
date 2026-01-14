@@ -29,7 +29,7 @@ export class Ship extends Entity {
         // Rotation (Only if not blocked)
         const rot = isDashboardBlocked ? 0 : input.getRotation();
         if (rot !== 0) {
-            this.rotation = rot * 0.1; // Scale rotation speed
+            this.rotation = rot * 0.05; // Scale rotation speed
         } else {
             this.rotation = 0;
         }

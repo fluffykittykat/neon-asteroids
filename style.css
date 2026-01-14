@@ -6,6 +6,11 @@
   --glass-bg: rgba(10, 10, 25, 0.85);
 }
 
+html {
+  height: 100%;
+  background-color: var(--bg-color);
+}
+
 body {
   margin: 0;
   overflow: hidden;
@@ -13,6 +18,9 @@ body {
   font-family: 'Courier New', Courier, monospace;
   color: white;
   user-select: none;
+  min-height: 100%;
+  height: 100dvh;
+  touch-action: none;
 }
 
 #game-canvas {
@@ -373,6 +381,8 @@ p {
 .profile-actions {
   display: flex;
   gap: 10px;
+  justify-content: center;
+  align-items: center;
 }
 
 .retro-btn {
@@ -396,28 +406,97 @@ p {
 
 @media (max-width: 768px) {
   h1 {
-    font-size: 40px;
+    font-size: 36px;
+    margin-bottom: 15px;
+  }
+
+  p {
+    font-size: 18px;
+  }
+
+  #start-screen,
+  #game-over-screen {
+    width: 85%;
+    max-width: 400px;
+    padding: 25px;
+    box-sizing: border-box;
+    /* Ensure padding doesn't overflow width */
+  }
+
+  /* Profile Actions: Wrap buttons on small screens */
+  .profile-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  /* Make buttons full width and finger-friendly */
+  .retro-btn,
+  .small-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 15px;
+    font-size: 18px;
+    box-sizing: border-box;
+  }
+
+  .profile-actions .small-btn {
+    margin: 5px 0;
+    /* Vertical stacking */
   }
 
   #dashboard-window {
     width: 95%;
     height: 90%;
     padding: 10px;
+    display: flex;
+    flex-direction: column;
   }
 
   .stats-grid {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 8px;
   }
 
   .rank-title {
     font-size: 20px;
+    margin-top: 10px;
   }
 
   /* Ensure inputs are easy to tap */
-  #chat-input,
-  #send-chat-btn {
-    height: 50px;
+  #chat-input-area {
+    padding: 10px;
+  }
+
+  #chat-input {
+    height: 40px;
     font-size: 16px;
+  }
+
+  #send-chat-btn {
+    height: 60px;
+    /* Big send button */
+    width: auto;
+    /* Keep intrinsic width or specific width */
+    min-width: 80px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+
+  /* Special case for landscape mobile (short height) */
+  h1 {
+    font-size: 24px;
+    margin: 5px;
+  }
+
+  #start-screen,
+  #game-over-screen {
+    padding: 10px;
+    width: 60%;
+  }
+
+  .retro-btn {
+    padding: 5px 15px;
+    margin-top: 5px;
   }
 }

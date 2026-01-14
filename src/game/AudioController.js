@@ -2,25 +2,30 @@ export class AudioController {
     constructor() {
         this.ctx = null;
         this.masterGain = null;
-        this.enabled = true;
+        this.enabled = true; // Enabled by default
         this.musicIntensity = 0;
         this.initialized = false;
+        this.isMusicPlaying = false;
+        this.alienMode = false;
     }
 
     init() {
         if (this.initialized) return;
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = 0.3;
+        this.masterGain.gain.value = 0.5; // Louder
         this.masterGain.connect(this.ctx.destination);
         this.initialized = true;
+        this.enabled = true;
     }
 
     resume() {
         if (!this.initialized) this.init();
 
         if (this.ctx.state === 'suspended') {
-            this.ctx.resume().catch(e => console.warn("Audio Resume Failed (User interaction needed)", e));
+            this.ctx.resume().then(() => {
+                // console.log("Audio Context Resumed");
+            }).catch(e => console.warn("Audio Resume Failed (User interaction needed)", e));
         }
 
         // Force iOS Unlock with Silent Buffer (Must be inside a user event)
@@ -55,25 +60,29 @@ export class AudioController {
 
         osc.start();
         osc.stop(this.ctx.currentTime + duration);
+
+        // Cleanup Graph
+        osc.onended = () => {
+            osc.disconnect();
+            gain.disconnect();
+        };
     }
 
     shoot() {
-        // Pew pew! Upgrade: Dual oscillator "Laser" chirp
         if (!this.enabled) return;
+        if (!this.initialized) this.init();
         const now = this.ctx.currentTime;
 
-        // 1. High-pitch Chirp (The "Pew")
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
 
-        osc.type = 'sawtooth'; // Saw is richer than square
-        osc.frequency.setValueAtTime(1200, now); // Start high
-        osc.frequency.exponentialRampToValueAtTime(100, now + 0.2); // Drop fast
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
 
         gain.gain.setValueAtTime(0.3, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
 
-        // 2. Low-end Punch (The "Thump")
         const subOsc = this.ctx.createOscillator();
         const subGain = this.ctx.createGain();
 
@@ -84,7 +93,6 @@ export class AudioController {
         subGain.gain.setValueAtTime(0.5, now);
         subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
 
-        // Connect
         osc.connect(gain);
         gain.connect(this.masterGain);
 
@@ -95,9 +103,59 @@ export class AudioController {
         osc.stop(now + 0.2);
         subOsc.start();
         subOsc.stop(now + 0.2);
+
+        // Cleanup
+        osc.onended = () => {
+            osc.disconnect();
+            gain.disconnect();
+        };
+        subOsc.onended = () => {
+            subOsc.disconnect();
+            subGain.disconnect();
+        };
     }
+
+    alienShoot() {
+        if (!this.enabled || !this.initialized) return;
+        const now = this.ctx.currentTime;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.linearRampToValueAtTime(300, now + 0.3);
+
+        const lfo = this.ctx.createOscillator();
+        lfo.frequency.value = 30;
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 200;
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+        lfo.start();
+
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start();
+        osc.stop(now + 0.3);
+        lfo.stop(now + 0.3);
+
+        // Cleanup Graph
+        osc.onended = () => {
+            osc.disconnect();
+            gain.disconnect();
+            lfo.disconnect();
+            lfoGain.disconnect();
+        };
+    }
+
     explode(color = '#ffffff', size = 1) {
         if (!this.enabled) return;
+        if (!this.initialized) this.init();
 
         const now = this.ctx.currentTime;
         // Base Volume varies by size (0.5 to 1.5)
@@ -168,6 +226,7 @@ export class AudioController {
     thrust() {
         // Engine hum
         if (!this.enabled) return;
+        if (!this.initialized) this.init();
         // Debounce thrust sound to avoid overlapping mess
         const now = this.ctx.currentTime;
         if (this._lastThrust && now - this._lastThrust < 0.1) return;
@@ -192,6 +251,7 @@ export class AudioController {
 
     die() {
         if (!this.enabled) return;
+        if (!this.initialized) this.init();
         const now = this.ctx.currentTime;
 
         // Pitiful descending slide
@@ -219,6 +279,7 @@ export class AudioController {
 
     ripple() {
         if (!this.enabled) return;
+        if (!this.initialized) this.init();
         // Sci-fi "warp" sound: Low frequency sweep
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -245,6 +306,7 @@ export class AudioController {
 
     moo() {
         if (!this.enabled) return;
+        if (!this.initialized) this.init();
 
         // Try Web Speech API for "Actual Word"
         if ('speechSynthesis' in window) {
@@ -272,120 +334,177 @@ export class AudioController {
     }
 
     startMusic() {
-        if (!this.enabled || this.isMusicPlaying) return;
+        if (!this.enabled) return;
+        if (this.isMusicPlaying) return; // Already running
         if (!this.initialized) this.init();
 
+        console.log("AudioController: Starting Music Loop (Scheduler)");
         this.isMusicPlaying = true;
-        this.musicIntensity = 0; // 0.0 to 1.0 (Low -> High)
-        this.ctx.resume(); // Ensure context is running
 
-        // Cyberpunk Arpeggio Sequence
-        const sequence = [
-            110, 130.81, 146.83, 164.81, // A2, C3, D3, E3
-            110, 130.81, 146.83, 196.00  // A2, C3, D3, G3
-        ];
-        let noteIndex = 0;
+        // Ensure context is ready
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(e => console.warn("Context resume failed in startMusic", e));
+        }
 
-        const playNextNote = () => {
-            if (!this.isMusicPlaying) return;
+        // Initialize Scheduler
+        this.musicIntensity = 0;
+        this.nextNoteTime = this.ctx.currentTime + 0.1; // Start slighly in future
+        this.noteIndex = 0;
 
-            // If context is suspended (locked), don't try to play or it warns.
-            // Just wait and try again.
+        this.scheduler();
+    }
+
+    scheduler() {
+        if (!this.isMusicPlaying) return;
+
+        try {
+            // Auto-Resume: If context suspended (e.g. user inactive or backgrounded), try to wake it
             if (this.ctx.state === 'suspended') {
-                setTimeout(() => playNextNote(), 500);
+                console.log("AudioScheduler: Context suspended, attempting resume...");
+                this.ctx.resume().catch(e => console.debug("Resume pending user gesture"));
+                // Retry in 500ms instead of tight loop
+                this.timerID = setTimeout(() => this.scheduler(), 500);
                 return;
             }
 
-            const now = this.ctx.currentTime;
+            // Lookahead: Schedule audio for the next 0.1s
+            const lookahead = 0.1;
 
-            // Dynamic Variables based on Intensity
-            const intensity = this.musicIntensity || 0;
-            const tempo = 0.2 - (intensity * 0.07); // Speed up
-            const filterFreq = 400 + (intensity * 1200); // Open filter
+            // If the context is somehow way behind (e.g. tab switch), reset time to avoid playing catch-up
+            if (this.nextNoteTime < this.ctx.currentTime - 0.5) {
+                this.nextNoteTime = this.ctx.currentTime + 0.1;
+            }
 
-            // Bass/Lead Synth
+            // Safety: Limit loop to prevent getting stuck if logic fails
+            let iterations = 0;
+            while (this.nextNoteTime < this.ctx.currentTime + lookahead && iterations < 10) {
+                this.playNoteAt(this.nextNoteTime);
+
+                // Advance Time
+                let intensity = this.musicIntensity || 0;
+                // Tempo: 0.2s (Low) -> 0.13s (High)
+                const tempo = Math.max(0.1, 0.2 - (intensity * 0.07)); // Clamp min tempo
+
+                this.nextNoteTime += tempo;
+                iterations++;
+            }
+        } catch (e) {
+            console.error("AudioScheduler Error:", e);
+        }
+
+        // Check scheduler often (e.g., every 25ms)
+        this.timerID = setTimeout(() => this.scheduler(), 25);
+    }
+
+    playNoteAt(time) {
+        try {
+            // Safe check for valid time
+            if (!isFinite(time)) return;
+
+            const sequence = [
+                220, 261.63, 293.66, 329.63, // A3, C4, D4, E4
+                220, 261.63, 293.66, 392.00  // A3, C4, D4, G4
+            ];
+
+            let currentSequence = sequence;
+            let intensity = this.musicIntensity || 0;
+
+            if (this.alienMode) {
+                intensity = Math.max(intensity, 0.8);
+                currentSequence = [
+                    220, 233.08, 220, 233.08,
+                    220, 246.94, 220, 207.65
+                ];
+            }
+
+            const noteFreq = currentSequence[this.noteIndex % currentSequence.length];
+            const tempo = Math.max(0.1, 0.2 - (intensity * 0.07));
+            const filterFreq = 400 + (intensity * 1200);
+
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
             const filter = this.ctx.createBiquadFilter();
 
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(sequence[noteIndex], now);
+            osc.type = this.alienMode ? 'square' : 'sawtooth';
+            osc.frequency.setValueAtTime(noteFreq, time);
 
-            // Detune at high intensity
             if (intensity > 0.6) {
-                osc.detune.setValueAtTime(Math.random() * 20 - 10, now);
+                osc.detune.setValueAtTime(Math.random() * 20 - 10, time);
             }
 
-            // Lowpass filter modulation
             filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(filterFreq, now);
-            filter.frequency.linearRampToValueAtTime(filterFreq + 400 + (intensity * 500), now + 0.1);
-            filter.frequency.linearRampToValueAtTime(filterFreq, now + tempo);
+            filter.frequency.setValueAtTime(filterFreq, time);
+            filter.frequency.linearRampToValueAtTime(filterFreq + 400 + (intensity * 500), time + 0.05);
+            filter.frequency.linearRampToValueAtTime(filterFreq, time + tempo);
 
-            gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(0.15, now + 0.05);
-            gain.gain.linearRampToValueAtTime(0, now + tempo);
+            gain.gain.setValueAtTime(0, time);
+            gain.gain.linearRampToValueAtTime(0.3, time + 0.02);
+            gain.gain.linearRampToValueAtTime(0, time + tempo - 0.02);
 
             osc.connect(filter);
             filter.connect(gain);
             gain.connect(this.masterGain);
 
-            osc.start(now);
-            osc.stop(now + tempo + 0.1);
+            osc.start(time);
+            osc.stop(time + tempo);
 
-            // Sub Bass Drone (Deepening Intensity)
-            if (noteIndex % 8 === 0) {
+            // Sub Bass
+            if (this.noteIndex % 8 === 0) {
                 const subOsc = this.ctx.createOscillator();
                 const subGain = this.ctx.createGain();
-                subOsc.type = intensity > 0.7 ? 'sawtooth' : 'square'; // Aggressive bass
-                subOsc.frequency.setValueAtTime(55, now);
+                subOsc.type = intensity > 0.7 ? 'sawtooth' : 'square';
+                subOsc.frequency.setValueAtTime(this.alienMode ? 40 : 55, time);
 
                 const bassVol = 0.2 + (intensity * 0.15);
-                subGain.gain.setValueAtTime(bassVol, now);
-                subGain.gain.exponentialRampToValueAtTime(0.01, now + (tempo * 8));
+                subGain.gain.setValueAtTime(bassVol, time);
+                subGain.gain.exponentialRampToValueAtTime(0.001, time + (tempo * 8));
 
                 subOsc.connect(subGain);
                 subGain.connect(this.masterGain);
-                subOsc.start(now);
-                subOsc.stop(now + (tempo * 8));
+                subOsc.start(time);
+                subOsc.stop(time + (tempo * 8));
             }
 
-            // Hi-Hat / Glitch (Added at Medium Intensity)
-            if (intensity > 0.3 && noteIndex % 2 === 0) {
+            // Hi-Hat
+            if (intensity > 0.3 && this.noteIndex % 2 === 0) {
                 const hatOsc = this.ctx.createOscillator();
                 const hatGain = this.ctx.createGain();
-                hatOsc.type = 'square';
-                hatOsc.frequency.setValueAtTime(8000 + (Math.random() * 2000), now); // Glitchy
-
-                hatGain.gain.setValueAtTime(intensity * 0.04, now);
-                hatGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-
                 const hatFilter = this.ctx.createBiquadFilter();
+
+                hatOsc.type = 'square';
+                hatOsc.frequency.setValueAtTime(8000 + (Math.random() * 2000), time);
+
                 hatFilter.type = 'highpass';
                 hatFilter.frequency.value = 6000;
+
+                hatGain.gain.setValueAtTime(intensity * 0.04, time);
+                hatGain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
 
                 hatOsc.connect(hatFilter);
                 hatFilter.connect(hatGain);
                 hatGain.connect(this.masterGain);
 
-                hatOsc.start(now);
-                hatOsc.stop(now + 0.1);
+                hatOsc.start(time);
+                hatOsc.stop(time + 0.05);
             }
 
-            noteIndex = (noteIndex + 1) % sequence.length;
-
-            // Schedule next note
-            setTimeout(() => playNextNote(), tempo * 1000);
-        };
-
-        playNextNote();
+            this.noteIndex++;
+        } catch (e) {
+            console.warn("Audio Playback Error:", e);
+        }
     }
 
     setMusicIntensity(val) {
         this.musicIntensity = Math.max(0, Math.min(1, val));
     }
 
+    setAlienMode(isActive) {
+        this.alienMode = isActive;
+    }
+
     stopMusic() {
         this.isMusicPlaying = false;
+        if (this.timerID) clearTimeout(this.timerID);
+        this.timerID = null;
     }
 }

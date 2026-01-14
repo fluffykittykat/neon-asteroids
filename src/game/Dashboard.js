@@ -42,16 +42,17 @@ export class Dashboard {
         };
     }
 
-    show(userId) {
+    show(user, lookUpId = null) {
         const ui = this.elements;
         if (!ui.overlay) {
             console.error("Dashboard overlay not found!");
             return;
         }
 
+        this.currentUser = user; // Store full user object
         ui.overlay.classList.remove('hidden');
         if (this.onVisibilityChange) this.onVisibilityChange(true);
-        this.loadLogs(userId);
+        this.loadLogs(user.uid, lookUpId);
         this.showList();
     }
 
@@ -72,7 +73,7 @@ export class Dashboard {
         return ui.overlay && !ui.overlay.classList.contains('hidden');
     }
 
-    async loadLogs(userId) {
+    async loadLogs(userId, autoOpenId = null) {
         this.currentLogUserId = userId;
         const ui = this.elements;
         if (!ui.logList) return;
@@ -94,7 +95,23 @@ export class Dashboard {
             div.innerHTML = `<span>${date}</span> <span>Score: ${log.score}</span>`;
             div.onclick = () => this.openDetails(log);
             ui.logList.appendChild(div);
+
+            // AUTO OPEN check
+            // We check if this log's ID matches the one we just saved
+            // Or if autoOpenId is 'latest' and this is the first one
+            if (autoOpenId && log.id === autoOpenId) {
+                this.openDetails(log);
+            }
         });
+
+        // Fallback: If we just saved but ID matching failed (e.g. slight delay in index), 
+        // usually the first one is the latest because of sort order.
+        if (autoOpenId && !logs.find(l => l.id === autoOpenId)) {
+            // Try opening the first one if it looks "fresh" (within 10 seconds)
+            if (logs[0] && Date.now() - logs[0].timestamp < 10000) {
+                this.openDetails(logs[0]);
+            }
+        }
     }
 
     async openDetails(log) {
@@ -110,6 +127,13 @@ export class Dashboard {
         // Reset Chat
         if (ui.chatHistory) ui.chatHistory.innerHTML = '';
 
+        // Load Persistent Chat History
+        if (log.chatTranscript && Array.isArray(log.chatTranscript) && log.chatTranscript.length > 0) {
+            log.chatTranscript.forEach(msg => {
+                this.addMessage(msg.text, msg.sender);
+            });
+        }
+
         // Initial analysis (Local Stats)
         const result = analyst.analyze(log);
 
@@ -120,24 +144,80 @@ export class Dashboard {
         const titleEl = document.getElementById('metric-title');
         if (titleEl) titleEl.innerText = result.title;
 
+        // Skip AI Greeting if we already have chat history
+        if (log.chatTranscript && log.chatTranscript.length > 0) {
+            return;
+        }
+
         // Initial AI Analysis or Greeting
         if (analyst.getApiKey()) {
-            this.addMessage("Analyzing mission telemetry...", 'ai blink');
+            // Capture log reference to prevent race conditions
+            const targetLog = log;
+            const targetLogId = log.id;
+
+            // Create a unique loading message for this specific analysis
+            const loadingMsgId = `loading-${targetLogId}`;
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = loadingMsgId;
+            loadingDiv.className = 'message ai blink';
+            loadingDiv.innerText = 'Analyzing mission telemetry...';
+            ui.chatHistory.appendChild(loadingDiv);
+
             try {
-                const summary = await analyst.generateSummary(log, this.currentLogUserId);
-                // Remove loading message (simple way: clear last child or just append, but let's clear to be clean)
-                if (ui.chatHistory.lastChild && ui.chatHistory.lastChild.innerText === "Analyzing mission telemetry...") {
-                    ui.chatHistory.removeChild(ui.chatHistory.lastChild);
+                const displayName = this.currentUser ? this.currentUser.displayName : "Pilot";
+                const firstName = displayName.split(' ')[0];
+                const summary = await analyst.generateSummary(targetLog, this.currentLogUserId, firstName);
+
+                // STRICT CHECK: Verify we're still on the exact same log
+                const currentId = this.currentLog ? this.currentLog.id : null;
+                if (currentId !== targetLogId) {
+                    console.log(`Log changed: was ${targetLogId}, now ${currentId}. Saving silently.`);
+                    // Still save to correct log in DB, but don't update UI
+                    if (this.currentLogUserId && targetLogId) {
+                        TelemetryService.saveChatMessage(this.currentLogUserId, targetLogId, 'ai', summary);
+                    }
+                    // Update the target log's local cache
+                    if (!targetLog.chatTranscript) targetLog.chatTranscript = [];
+                    targetLog.chatTranscript.push({ sender: 'ai', text: summary, timestamp: Date.now() });
+
+                    // Remove our specific loading message if it's still in the DOM
+                    const oldLoader = document.getElementById(loadingMsgId);
+                    if (oldLoader && oldLoader.parentNode) {
+                        oldLoader.parentNode.removeChild(oldLoader);
+                    }
+                    return;
                 }
+
+                // Remove loading message by ID
+                const loader = document.getElementById(loadingMsgId);
+                if (loader && loader.parentNode) {
+                    loader.parentNode.removeChild(loader);
+                }
+
                 this.addMessage(summary, 'ai');
+
+                // UPDATE LOCAL CACHE so we don't regenerate if user comes back
+                if (!targetLog.chatTranscript) targetLog.chatTranscript = [];
+                targetLog.chatTranscript.push({ sender: 'ai', text: summary, timestamp: Date.now() });
+
+                // Save this initial summary too!
+                if (this.currentLogUserId && targetLogId) {
+                    TelemetryService.saveChatMessage(this.currentLogUserId, targetLogId, 'ai', summary);
+                }
             } catch (e) {
-                this.addMessage("Analysis Failed: " + e.message, 'ai');
+                // Only show error if still on same log
+                const currentId = this.currentLog ? this.currentLog.id : null;
+                if (currentId === targetLogId) {
+                    // Remove loading message
+                    const loader = document.getElementById(loadingMsgId);
+                    if (loader && loader.parentNode) {
+                        loader.parentNode.removeChild(loader);
+                    }
+                    this.addMessage("Analysis Failed: " + e.message, 'ai');
+                }
             }
         } else {
-            this.addMessage("Flight Data Loaded. To enable AI analysis, please provide a Gemini API Key.", 'ai');
-            setTimeout(() => {
-                this.addMessage("WARNING: Cognitive Processors Offline. Please enter your Google Gemini API Key to enable advanced analysis. (Type /apikey YOUR_KEY)", 'ai');
-            }, 500);
+            this.addMessage("AI Analysis Unavailable: System not configured.", 'ai');
         }
     }
 
@@ -148,20 +228,26 @@ export class Dashboard {
         const text = ui.chatInput.value.trim();
         if (!text) return;
 
+        // Capture references at submit time to prevent race conditions
+        const targetLog = this.currentLog;
+        const targetLogId = targetLog ? targetLog.id : null;
+        const userId = this.currentLogUserId;
+
         this.addMessage(text, 'user');
         ui.chatInput.value = '';
 
-        // Check for commands
-        if (text.startsWith('/apikey ')) {
-            const key = text.split(' ')[1];
-            if (key) {
-                analyst.setApiKey(key);
-                this.addMessage("API Key saved. Cognitive systems online.", 'ai');
-            } else {
-                this.addMessage("Invalid Syntax. Usage: /apikey YOUR_KEY", 'ai');
-            }
-            return;
+        // LOCAL CACHE UPDATE (User)
+        if (targetLog) {
+            if (!targetLog.chatTranscript) targetLog.chatTranscript = [];
+            targetLog.chatTranscript.push({ sender: 'user', text: text, timestamp: Date.now() });
         }
+
+        // Save User Message
+        if (userId && targetLogId) {
+            TelemetryService.saveChatMessage(userId, targetLogId, 'user', text);
+        }
+
+        // Command handling removed (API Key is now build-managed)
 
         // Simulate thinking delay
         const loadingMsg = document.createElement('div');
@@ -171,18 +257,43 @@ export class Dashboard {
         ui.chatHistory.scrollTop = ui.chatHistory.scrollHeight;
 
         try {
-            // Get current user ID from the log itself or auth service?
-            // Since we are viewing a log, the log owner IS the user we want history for.
-            // But we can also look up the "currentUser" if needed. 
-            // The dashboard's loadLogs was called with userId. We should cache it.
-            const userId = this.currentLogUserId;
+            const displayName = this.currentUser ? this.currentUser.displayName : "Pilot";
+            const firstName = displayName.split(' ')[0]; // Use first name only
+            const response = await analyst.ask(text, targetLog, userId, firstName);
 
-            const response = await analyst.ask(text, this.currentLog, userId);
+            // Check if user switched logs during AI response
+            if (this.currentLog?.id !== targetLogId) {
+                console.log("Log changed during chat, saving to original log only");
+                // Save to correct log but don't update UI
+                if (userId && targetLogId) {
+                    TelemetryService.saveChatMessage(userId, targetLogId, 'ai', response);
+                }
+                if (targetLog) {
+                    targetLog.chatTranscript.push({ sender: 'ai', text: response, timestamp: Date.now() });
+                }
+                // Remove loading message if it still exists
+                if (loadingMsg.parentNode) loadingMsg.parentNode.removeChild(loadingMsg);
+                return;
+            }
+
             ui.chatHistory.removeChild(loadingMsg);
             this.addMessage(response, 'ai');
+
+            // LOCAL CACHE UPDATE (AI)
+            if (targetLog) {
+                targetLog.chatTranscript.push({ sender: 'ai', text: response, timestamp: Date.now() });
+            }
+
+            // Save AI Response
+            if (userId && targetLogId) {
+                TelemetryService.saveChatMessage(userId, targetLogId, 'ai', response);
+            }
         } catch (err) {
-            ui.chatHistory.removeChild(loadingMsg);
-            this.addMessage("Error analyzing data.", 'ai');
+            if (loadingMsg.parentNode) loadingMsg.parentNode.removeChild(loadingMsg);
+            // Only show error if still on same log
+            if (this.currentLog?.id === targetLogId) {
+                this.addMessage("Error analyzing data.", 'ai');
+            }
         }
     }
 

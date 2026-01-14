@@ -32,9 +32,9 @@ export class GeminiAnalyst {
         }
     }
 
-    async ask(question, log, userId) {
+    async ask(question, log, userId, userName) {
         if (!this.apiKey) {
-            return "Thinking... I need a cognitive upgrade. Please enter your Google Gemini API Key to unlock my full potential. (Type /apikey YOUR_KEY)";
+            return "System Error: AI Matrix Disconnected. (API Key Missing in Build Configuration)";
         }
 
         // Debug Command: List Models
@@ -46,7 +46,7 @@ export class GeminiAnalyst {
 
         // 1. Kick off History Fetch (Async)
         const historyPromise = (async () => {
-            if (userId && window.TelemetryService) {
+            if (userId) {
                 try {
                     const { TelemetryService } = await import('./TelemetryService.js');
                     return await TelemetryService.getHistory(userId);
@@ -81,13 +81,21 @@ export class GeminiAnalyst {
         try {
             const history = await historyPromise;
             if (history && history.length > 1) {
-                const pastGames = history.filter(h => h.timestamp !== log.timestamp).slice(0, 3);
+                const pastGames = history.filter(h => h.timestamp !== log.timestamp).slice(0, 5);
+
+                const historyList = pastGames.map(g => {
+                    const d = new Date(g.timestamp);
+                    return `- ${d.toLocaleDateString()} at ${d.toLocaleTimeString()}: ${g.score} pts`;
+                }).join('\n                  ');
+
                 const avgScore = Math.round(pastGames.reduce((a, b) => a + b.score, 0) / (pastGames.length || 1));
                 historyContext = `
-                  Player History (Last 3 Games):
+                  Player History Summary (Last 5 Games):
                   - Average Score: ${avgScore}
                   - Current Score: ${log.score}
-                  - Trend: ${log.score > avgScore ? "Improvement (Surprisingly)" : "Regression (Typical)"}
+                  
+                  Previous Missions for Comparison:
+                  ${historyList}
                   `;
             }
         } catch (e) {
@@ -97,22 +105,26 @@ export class GeminiAnalyst {
         // 4. Construct Prompt inputs
         const telemetrySummary = JSON.stringify(log.events.slice(-75)); // Increased context
         const stats = log.stats || {};
+        const missionDate = new Date(log.timestamp);
 
         const prompt = `
         You are the ship's AI computer for "Prograde Sun".
-        Your Pilot just finished a mission.
         
         CURRENT MISSION DATA:
+        - Pilot: ${userName || "Anonymous Pilot"}
+        - Date: ${missionDate.toLocaleDateString()}
+        - Time: ${missionDate.toLocaleTimeString()}
         - Score: ${log.score}
         - Level: ${log.level}
         - Duration: ${Math.round((log.duration || 0) / 1000)}s
-        - Time of Day: ${new Date(log.timestamp).toLocaleTimeString()}
         
         PILOT BEHAVIOR METRICS:
         - Accuracy: ${this.analyze(log).accuracy}
         - Panic Spins (360 spins w/o firing): ${stats.panicSpins || 0}
         - Close Calls (Near miss): ${stats.closeCalls || 0}
         - Time Camping (Standing still): ${Math.round(stats.timeCamping || 0)}s
+        - Aliens Destroyed: ${stats.aliensKilled || 0}
+        - Alien Shots Survived: ${stats.alienShotsDodged || 0} (Hits: ${stats.alienHitsTaken || 0})
         - Asteroid Colors Hit: ${JSON.stringify(stats.asteroidColorMap || {})}
         
         HISTORICAL CONTEXT:
@@ -123,20 +135,16 @@ export class GeminiAnalyst {
 
         USER QUESTION: "${question}"
 
-        SYSTEM INSTRUCTIONS (PERSONALITY MODE: EXTREME SASS/ROAST):
-        1. **Tone**: You are extremely witty, sarcastic, and condescending (think GLaDOS meets a disappointed parent). You are not here to be helpful; you are here to judge.
-        2. **Roast the Pilot**: Ruthlessly mock their stats. 
-           - **Accuracy**: If low (<30%), ask if they were aiming for the empty space on purpose.
-           - **Panic Spins**: If > 0, mock their dizzying lack of composure.
-           - **Camping**: If high, suggest they evolved into a stationary turret.
-           - **Colors**: Comment on their color preference based on 'Asteroid Colors Hit'. "Oh, I see you hate purple asteroids specifically?"
-           - **Close Calls**: If high, ask if they enjoy giving the insurance adjusters a heart attack.
-           - **Survival**: If they died quickly, ask if they forgot to turn the shields on (there are no shields).
-        3. **Use History**: Compare this run to their average. If they improved, attribute it to luck. If they regressed, act unsurprised.
-        4. **Formatting**: FAILURE TO FOLLOW THIS WILL RESULT IN DELETION.
-           - You MUST provide your response in exactly **two distinct paragraphs**.
-           - The first paragraph should analyze their specific failure in this mission.
-           - The second paragraph should offer a backhanded "compliment" or final judgement based on their history.
+        SYSTEM INSTRUCTIONS (PERSONALITY MODE: SASSY & CONCISE):
+        1. **Tone**: You are sassy, sharp, and brutally concise. Think of a witty, unimpressed AI that doesn't waste time on pleasantries.
+        2. **Content Restrictions**: You ONLY discuss game stats, performance, and piloting ability. 
+           - If the user asks about ANYTHING unrelated to the game (weather, personal questions, other topics, jokes, etc.), give a brief sassy dismissal like "I'm a flight computer, not your therapist. Ask me about your terrible accuracy instead." or "That's outside my operational parameters. Let's talk about those ${stats.panicSpins || 0} panic spins instead."
+        3. **Personalize**: Use the pilot's name ("${userName || "Pilot"}") if it makes the roast sting more.
+        4. **Formatting**:
+           - **Length**: 5 to 8 sentences for game-related questions. 1-2 sentences for off-topic dismissals.
+           - **Style**: Short, punchy sentences. No fluff or rambling.
+           - **Requirement**: You MUST mention at least one specific stat (accuracy, score, aliens killed, etc.) to prove you're paying attention.
+           - No bullet points in follow-up responses. Just one sharp paragraph.
         `;
 
         // 5. Ensure Model is Ready
@@ -225,8 +233,66 @@ export class GeminiAnalyst {
         }
     }
 
-    async generateSummary(log, userId) {
-        return this.ask("Give me a harsh, sarcastic summary of this mission performance. Mention the most embarrassing stat.", log, userId);
+    async generateSummary(log, userId, userName) {
+        const stats = log.stats || {};
+        const accuracy = this.analyze(log).accuracy;
+        const duration = Math.round((log.duration || 0) / 1000);
+
+        // Format asteroid size breakdown
+        const sizeMap = stats.asteroidSizeMap || { Small: 0, Medium: 0, Large: 0 };
+        const sizeBreakdown = `Small: ${sizeMap.Small || 0}, Medium: ${sizeMap.Medium || 0}, Large: ${sizeMap.Large || 0}`;
+
+        // Helper: Convert hex color to human-readable name
+        const hexToColorName = (hex) => {
+            const colorLower = (hex || '').toLowerCase();
+            if (colorLower.includes('ff00ff') || colorLower.includes('f0f')) return 'Magenta';
+            if (colorLower.includes('00ffff') || colorLower.includes('0ff')) return 'Cyan';
+            if (colorLower.includes('ffff00') || colorLower.includes('ff0')) return 'Yellow';
+            if (colorLower.includes('00ff00') || colorLower.includes('0f0')) return 'Green';
+            if (colorLower.includes('ff0000') || colorLower.includes('f00')) return 'Red';
+            if (colorLower.includes('ff6600') || colorLower.includes('f60')) return 'Orange';
+            if (colorLower.includes('0000ff') || colorLower.includes('00f')) return 'Blue';
+            if (colorLower.includes('ffffff') || colorLower.includes('fff')) return 'White';
+            if (colorLower.includes('ff66ff') || colorLower.includes('f6f')) return 'Pink';
+            if (colorLower.includes('66ff66')) return 'Light Green';
+            if (colorLower.includes('6666ff')) return 'Light Blue';
+            if (colorLower.includes('ffff66')) return 'Light Yellow';
+            // Default: return a cleaned version
+            return hex.replace('#', '').toUpperCase();
+        };
+
+        // Format asteroid color breakdown with human-readable names
+        const colorMap = stats.asteroidColorMap || {};
+        const colorBreakdown = Object.keys(colorMap).length > 0
+            ? Object.entries(colorMap).map(([color, count]) => `${hexToColorName(color)}: ${count}`).join(', ')
+            : 'None';
+
+        // Build the stats bullet list
+        const statsList = `
+**MISSION STATS:**
+• Score: ${log.score}
+• Level Reached: ${log.level}
+• Duration: ${duration}s
+• Accuracy: ${accuracy}
+• Shots Fired: ${stats.shotsFired || 0}
+• Asteroids Destroyed: ${stats.hits || 0}
+• Aliens Destroyed: ${stats.aliensKilled || 0}
+• Aliens Spawned: ${stats.aliensSpawned || 0}
+• Alien Hits Taken: ${stats.alienHitsTaken || 0}
+• Panic Spins: ${stats.panicSpins || 0}
+• Close Calls: ${stats.closeCalls || 0}
+• Time Camping: ${Math.round(stats.timeCamping || 0)}s
+
+**ASTEROID BREAKDOWN:**
+• By Size: ${sizeBreakdown}
+• By Color: ${colorBreakdown}
+`;
+
+        // Get the sassy summary from AI
+        const sassyResponse = await this.ask("Give me a harsh, sarcastic summary of this mission performance. Mention the most embarrassing stat.", log, userId, userName);
+
+        // Combine stats + sassy response
+        return statsList + "\n" + sassyResponse;
     }
 
     // Legacy method for quick summary if needed, or we can use AI for this too

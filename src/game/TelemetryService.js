@@ -1,4 +1,4 @@
-import { getFirestore, collection, addDoc, doc, setDoc, query, orderBy, limit, getDocs } from "firebase/firestore";
+import { getFirestore, collection, addDoc, doc, setDoc, query, orderBy, limit, getDocs, updateDoc, arrayUnion } from "firebase/firestore";
 import { app } from "./AuthService.js";
 
 let db;
@@ -59,7 +59,8 @@ export const TelemetryService = {
             level: level,
             events: TelemetryService.logs, // Save the raw flight log
             stats: stats || {}, // Save the extended stats
-            processed: false // Trigger for AI Analysis
+            processed: false, // Trigger for AI Analysis
+            chatTranscript: [] // Initialize empty chat
         };
 
         try {
@@ -67,13 +68,13 @@ export const TelemetryService = {
             const userRef = doc(db, "users", userId);
             const gamesRef = collection(userRef, "games");
             await addDoc(gamesRef, gameData);
-            console.log("Telemetry Saved to Firestore!");
+            console.log("Telemetry Saved to Firestore!", userRef.id);
             // alert("Flight Log Saved to Database!"); // VISIBLE FEEDBACK - Removed per user request
-            return true;
+            return userRef.id; // Return ID for auto-open
         } catch (e) {
             console.error("Failed to save telemetry:", e);
             alert("Telemetry Error: " + e.message + "\n(Did you enable Firestore in the Console?)");
-            return false;
+            return null;
         }
     },
 
@@ -97,7 +98,8 @@ export const TelemetryService = {
             const q = query(gamesRef, orderBy("timestamp", "desc"), limit(500));
             const snapshot = await getDocs(q);
 
-            return snapshot.docs.map(doc => doc.data());
+            // Include Document ID for updates
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         } catch (e) {
             console.error("Error fetching history:", e);
             if (e.message.includes("requires an index")) {
@@ -106,6 +108,57 @@ export const TelemetryService = {
                 alert("Failed to load flight logs: " + e.message);
             }
             return [];
+        }
+    },
+
+    saveChatMessage: async (userId, gameId, sender, text) => {
+        if (!db) return;
+        try {
+            const gameRef = doc(db, "users", userId, "games", gameId);
+            await updateDoc(gameRef, {
+                chatTranscript: arrayUnion({
+                    sender: sender,
+                    text: text,
+                    timestamp: Date.now()
+                })
+            });
+        } catch (e) {
+            console.error("Failed to save chat message:", e);
+        }
+    },
+
+    updateUserProfile: async (user) => {
+        if (!db || !user) return;
+        try {
+            const userRef = doc(db, "users", user.uid);
+
+            // Collect all available user data from Firebase Auth
+            const profileData = {
+                // Core Identity
+                uid: user.uid,
+                displayName: user.displayName || null,
+                email: user.email || null,
+                photoURL: user.photoURL || null,
+                phoneNumber: user.phoneNumber || null,
+
+                // Verification Status
+                emailVerified: user.emailVerified || false,
+                isAnonymous: user.isAnonymous || false,
+
+                // Timestamps
+                lastLogin: Date.now(),
+                createdAt: user.metadata?.creationTime || null,
+                lastSignIn: user.metadata?.lastSignInTime || null,
+
+                // Provider Information
+                providerId: user.providerData?.[0]?.providerId || 'unknown',
+                providerUid: user.providerData?.[0]?.uid || null,
+            };
+
+            await setDoc(userRef, profileData, { merge: true });
+            console.log("User Profile Updated in Firestore:", profileData.displayName);
+        } catch (e) {
+            console.error("Failed to update user profile:", e);
         }
     }
 };

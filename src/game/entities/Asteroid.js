@@ -65,7 +65,9 @@ export class Asteroid extends Entity {
 
     break() {
         const newPieces = [];
-        if (this.radius > 20) {
+        // Break into smaller pieces if large enough
+        // Minimum size to break: 12px (creates 6px pieces)
+        if (this.radius > 12) {
             const count = 2; // Always split into 2
             for (let i = 0; i < count; i++) {
                 const a = new Asteroid(this.pos.x, this.pos.y, this.radius / 2);
@@ -73,6 +75,7 @@ export class Asteroid extends Entity {
                 newPieces.push(a);
             }
         }
+        // Asteroids with radius <= 12 just disappear (don't spawn pieces)
         return newPieces;
     }
 }
