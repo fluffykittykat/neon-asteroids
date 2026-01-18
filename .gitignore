@@ -1,8 +1,2 @@
+.idx/
 node_modules
-dist
-.env
-.DS_Store
-coverage
-.vscode
-*.log
-.env.local
