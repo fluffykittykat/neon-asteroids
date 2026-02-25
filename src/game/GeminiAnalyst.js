@@ -68,9 +68,9 @@ export class GeminiAnalyst {
                     this.model = this.genAI.getGenerativeModel({ model: bestModel });
                 } catch (e) {
                     console.error("Model discovery failed, using fallback.", e);
-                    this.currentModelName = "gemini-1.5-flash";
+                    this.currentModelName = "gemini-flash-latest";
                     if (this.genAI) {
-                        this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                        this.model = this.genAI.getGenerativeModel({ model: "gemini-flash-latest" });
                     }
                 }
             }
@@ -186,7 +186,7 @@ export class GeminiAnalyst {
     }
 
     async discoverBestModel() {
-        if (!this.apiKey) return "gemini-1.5-flash"; // Fallback default
+        if (!this.apiKey) return "gemini-flash-latest"; // Fallback default
 
         try {
             // Fetch available models dynamically
@@ -195,7 +195,7 @@ export class GeminiAnalyst {
 
             if (!data.models) {
                 console.warn("No models returned by API, using default.");
-                return "gemini-1.5-flash";
+                return "gemini-flash-latest";
             }
 
             const modelNames = data.models.map(m => m.name);
@@ -203,11 +203,11 @@ export class GeminiAnalyst {
 
             // Priority List
             const candidates = [
-                'models/gemini-1.5-flash',
-                'models/gemini-1.5-flash-latest',
-                'models/gemini-1.5-flash-001',
-                'models/gemini-pro',
-                'models/gemini-1.0-pro'
+                'models/gemini-2.0-flash',
+                'models/gemini-2.5-flash',
+                'models/gemini-flash-latest',
+                'models/gemini-2.0-flash-lite',
+                'models/gemini-1.5-flash'
             ];
 
             // return the first match found in available models
@@ -225,11 +225,11 @@ export class GeminiAnalyst {
             // If no specific favourite found, pick the first one that supports generateContent
             // (Heuristic: usually contains 'gemini')
             const fallback = modelNames.find(m => m.includes('gemini') && !m.includes('vision'));
-            return fallback ? fallback.replace('models/', '') : "gemini-1.5-flash";
+            return fallback ? fallback.replace('models/', '') : "gemini-flash-latest";
 
         } catch (e) {
             console.error("Failed to list models:", e);
-            return "gemini-1.5-flash";
+            return "gemini-flash-latest";
         }
     }
 
