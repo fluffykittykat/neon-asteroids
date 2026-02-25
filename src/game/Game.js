@@ -11,6 +11,7 @@ import { TouchControls } from './TouchControls.js';
 import { AuthService } from './AuthService.js';
 import { TelemetryService } from './TelemetryService.js';
 import { Dashboard } from './Dashboard.js';
+import { AdController } from './AdController.js';
 
 export class Game {
     constructor(canvas) {
@@ -135,6 +136,11 @@ export class Game {
 
         this.setupAuth();
         this.updateUI();
+
+        // Ads
+        this.ads = new AdController();
+        // Show banner on initial load
+        this.ads.showBottomBanner();
 
         // Mobile and Resize logic moved to top of constructor to ensure correct entity spawning
 
@@ -330,6 +336,8 @@ export class Game {
 
     startGame() {
         this.state = 'PLAYING';
+        this.ads.hideBottomBanner();
+        this.ads.hideGameOverAd();
         this.uiStartScreen.classList.add('hidden');
         this.uiStartScreen.classList.remove('visible');
         this.uiGameOverScreen.classList.add('hidden');
@@ -366,6 +374,8 @@ export class Game {
     endGame() {
         this.state = 'START';
         this.audio.stopMusic();
+        this.ads.showBottomBanner();
+        this.ads.hideGameOverAd();
 
         // UI Reset
         this.uiStartScreen.classList.remove('hidden');
@@ -1047,6 +1057,8 @@ export class Game {
 
         this.uiGameOverScreen.classList.remove('hidden');
         this.uiGameOverScreen.classList.add('visible');
+        this.ads.showGameOverAd();
+        this.ads.showBottomBanner();
         this.uiFinalScore.innerText = this.score;
         this.updateUI();
     }
