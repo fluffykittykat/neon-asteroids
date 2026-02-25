@@ -29,7 +29,7 @@ You can deploy directly from your source code using a single command. Cloud Run 
 Run the following command in the project root:
 
 ```powershell
-gcloud run deploy neon-asteroids --source . --port 8080 --region us-central1 --allow-unauthenticated --set-env-vars VITE_GEMINI_API_KEY=AIzaSyDJ59L7nRuoVZ0b0kh9FXahXA1XtSAGKuM
+gcloud run deploy neon-asteroids --source . --port 8080 --region us-central1 --allow-unauthenticated --set-env-vars VITE_GEMINI_API_KEY=YOUR_KEY_HERE
 ```
 
 **Explanation of flags:**

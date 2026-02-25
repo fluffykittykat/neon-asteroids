@@ -33,11 +33,16 @@ cmd /c docker build -t neon-asteroids .
 ```
 
 ## 5. Deploy to Google Cloud Run
+Read the API key from the local `.env` file (NEVER hardcode it in the command):
 ```powershell
-cmd /c gcloud run deploy neon-asteroids --source . --port 8080 --region us-central1 --allow-unauthenticated --set-env-vars VITE_GEMINI_API_KEY=AIzaSyDJ59L7nRuoVZ0b0kh9FXahXA1XtSAGKuM
+cmd /c "for /f \"tokens=1,* delims==\" %a in ('findstr VITE_GEMINI_API_KEY .env') do gcloud run deploy neon-asteroids --source . --port 8080 --region us-central1 --allow-unauthenticated --set-env-vars VITE_GEMINI_API_KEY=%b"
 ```
-This command builds the container in Cloud Build and deploys it to Cloud Run.
 
 ## 6. Verify deployment
 Confirm the Service URL is returned and the app is accessible at:
 https://neon-asteroids-210721664554.us-central1.run.app
+
+## IMPORTANT: API Key Security
+- The API key lives ONLY in `.env` (gitignored)
+- NEVER commit API keys to the repository
+- NEVER hardcode keys in deploy commands or config files
