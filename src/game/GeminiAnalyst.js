@@ -157,28 +157,30 @@ export class GeminiAnalyst {
         } catch (error) {
             console.error(`Gemini Error (${this.currentModelName}):`, error);
 
-            // Fallback Logic
-            if (error.message.includes('404') || error.message.includes('not found')) {
-                console.warn("Model not found or failed. Attempting re-discovery or fallback.");
+            // Check for actual API key issues first
+            if (error.message.includes("API_KEY_INVALID") || error.message.includes("API key not valid")) {
+                return "Error: Invalid API Key. Please update it.";
+            }
+
+            // Fallback Logic for model errors (404, deprecated, unavailable)
+            if (error.message.includes('404') || error.message.includes('not found') || error.message.includes('no longer available') || error.message.includes('deprecated')) {
+                console.warn(`Model ${this.currentModelName} failed. Attempting re-discovery.`);
                 try {
-                    // Force re-discovery of best model
+                    // Reset cached model so discovery runs fresh
+                    this.currentModelName = null;
+                    this.model = null;
                     const bestModel = await this.discoverBestModel();
-                    console.log(`Auto-Discovered Model: ${bestModel}`);
+                    console.log(`Re-Discovered Model: ${bestModel}`);
                     this.currentModelName = bestModel;
                     this.model = this.genAI.getGenerativeModel({ model: bestModel });
 
-                    // Retry generating content with the newly discovered model
                     const result = await this.model.generateContent(prompt);
                     const response = await result.response;
                     return response.text();
                 } catch (fallbackError) {
                     console.error("Model re-discovery and fallback failed:", fallbackError);
-                    return `Error: Even the backup brain failed. (${fallbackError.message})`;
+                    return `Error: AI model unavailable. (${fallbackError.message})`;
                 }
-            }
-
-            if (error.message.includes("API key")) {
-                return "Error: Invalid API Key. Please update it.";
             }
 
             return `Communication Error with ${this.currentModelName}. Try /models to debug or check console.`;
@@ -220,9 +222,13 @@ export class GeminiAnalyst {
                 }
             }
 
-            // If no specific favourite found, pick the first one that supports generateContent
-            // (Heuristic: usually contains 'gemini')
-            const fallback = modelNames.find(m => m.includes('gemini') && !m.includes('vision'));
+            // If no specific candidate found, pick the first non-deprecated gemini model
+            const deprecated = ['1.0', '1.5', '2.0-flash'];
+            const fallback = modelNames.find(m =>
+                m.includes('gemini') &&
+                !m.includes('vision') &&
+                !deprecated.some(d => m.includes(d))
+            );
             return fallback ? fallback.replace('models/', '') : "gemini-flash-latest";
 
         } catch (e) {
