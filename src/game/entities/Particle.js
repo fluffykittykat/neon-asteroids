@@ -11,6 +11,7 @@ export class Particle extends Entity {
         this.life = 1.0;
         this.decay = Math.random() * 0.03 + 0.015;
         this.radius = Math.random() * 3 + 1;
+        this._customDraw = false; // Flag for particles with overridden draw (e.g. mini-cows)
     }
 
     update(width, height) {
@@ -26,10 +27,48 @@ export class Particle extends Entity {
         ctx.save();
         ctx.globalAlpha = this.life;
         ctx.fillStyle = this.color;
-        // Optimized: Removed shadowBlur for performance
         ctx.beginPath();
         ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+    }
+
+    /**
+     * Batch-render all particles with minimal state changes.
+     * Custom-draw particles (e.g. mini-cows) fall back to individual draw().
+     */
+    static batchDraw(particles, ctx) {
+        const groups = {};
+        const custom = [];
+
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            if (p._customDraw) {
+                custom.push(p);
+                continue;
+            }
+            if (!groups[p.color]) groups[p.color] = [];
+            groups[p.color].push(p);
+        }
+
+        // Batch draw by color group
+        ctx.save();
+        for (const color in groups) {
+            const group = groups[color];
+            ctx.fillStyle = color;
+            for (let i = 0; i < group.length; i++) {
+                const p = group[i];
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        ctx.restore();
+
+        // Draw custom particles individually
+        for (let i = 0; i < custom.length; i++) {
+            custom[i].draw(ctx);
+        }
     }
 }

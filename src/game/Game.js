@@ -62,9 +62,6 @@ export class Game {
         this.camera = new Vector2(0, 0);
         this.shake = 0;
 
-        this.screenShake = 0; // Deprecated, using this.shake
-
-        // Background Effects
         // Background Effects
         this.gridOffset = new Vector2(0, 0);
         this.stars = [];
@@ -127,8 +124,6 @@ export class Game {
         this.userProfile = document.getElementById('user-profile');
         this.userAvatar = document.getElementById('user-avatar');
         this.userName = document.getElementById('user-name');
-        this.userName = document.getElementById('user-name');
-        // this.btnTestDB = document.getElementById('test-db-btn'); // Removed per user request
         this.btnLogs = document.getElementById('view-logs-btn');
         this.btnLogout = document.getElementById('logout-btn');
         this.startPrompt = document.getElementById('start-prompt');
@@ -182,13 +177,7 @@ export class Game {
             });
         }
 
-        // Listen for DB Test
-        if (this.btnTestDB) {
-            this.btnTestDB.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (this.user) TelemetryService.testConnection(this.user.uid);
-            });
-        }
+
 
         // Listen for Logs
         if (this.btnLogs) {
@@ -267,8 +256,7 @@ export class Game {
     start() {
         this.initLevel();
 
-        // Require a click to ensure audio context (if added later) and focus
-        // Require a click to ensure audio context (if added later) and focus
+        // Require a click to ensure audio context and focus
         const startAction = (e) => {
             if (!this.user) return; // REQUIRE LOGIN
 
@@ -341,7 +329,6 @@ export class Game {
         this.uiStartScreen.classList.add('hidden');
         this.uiStartScreen.classList.remove('visible');
         this.uiGameOverScreen.classList.add('hidden');
-        this.uiGameOverScreen.classList.remove('visible');
         this.uiGameOverScreen.classList.remove('visible');
         this.resetGame(); // Changed from this.reset()
         if (this.touchControls) this.touchControls.setActive(true);
@@ -448,7 +435,7 @@ export class Game {
             do {
                 x = Math.random() * this.width;
                 y = Math.random() * this.height;
-            } while (Vector2.distance(new Vector2(x, y), new Vector2(this.width / 2, this.height / 2)) < 200);
+            } while (Math.hypot(x - this.width / 2, y - this.height / 2) < 200);
 
             this.asteroids.push(new Asteroid(x, y));
         }
@@ -489,23 +476,26 @@ export class Game {
         }
 
         // Always update particles
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-            p.update(this.width, this.height);
-            if (p.isDead) {
-                this.particles.splice(i, 1);
-            }
+        for (let i = 0; i < this.particles.length; i++) {
+            this.particles[i].update(this.width, this.height);
         }
+        this.particles = this.particles.filter(p => !p.isDead);
 
         // --- BACKGROUND UPDATE (Constant Drift + Parallax) ---
-        const drift = { x: 0, y: 4.0 }; // INCREASED SPEED
+        const driftY = 4.0;
+
+        // Update grid offset for parallax
+        if (this.ship && !this.ship.isDead) {
+            this.gridOffset.x -= this.ship.vel.x * 0.5;
+            this.gridOffset.y -= this.ship.vel.y * 0.5;
+        }
 
         // Asteroid vs Asteroid Collisions
         this.checkAsteroidCollisions();
 
         // Helper for parallax
         const updateBg = (el, speedMult) => {
-            el.y += drift.y * speedMult; // Constant drift
+            el.y += driftY * speedMult; // Constant drift
 
             if (this.ship && !this.ship.isDead) {
                 el.x -= this.ship.vel.x * speedMult;
@@ -523,7 +513,7 @@ export class Game {
         this.planets.forEach(p => updateBg(p, p.speed));
 
         // Update Ripples (Always run)
-        for (let i = this.ripples.length - 1; i >= 0; i--) {
+        for (let i = 0; i < this.ripples.length; i++) {
             const r = this.ripples[i];
             r.radius += r.speed;
             r.amplitude *= 0.95; // Decay power
@@ -531,46 +521,32 @@ export class Game {
             // Physics: Push Asteroids
             if (this.state === 'PLAYING') {
                 for (const a of this.asteroids) {
-                    const dist = Vector2.distance(new Vector2(r.x, r.y), a.pos);
+                    const dist = Math.hypot(r.x - a.pos.x, r.y - a.pos.y);
                     // Check if asteroid is in the "wave zone" (width of wave)
                     if (Math.abs(dist - r.radius) < r.width) {
                         // Push away from center
                         const angle = Math.atan2(a.pos.y - r.y, a.pos.x - r.x);
-                        const force = new Vector2(Math.cos(angle), Math.sin(angle));
 
                         // Strength depends on amplitude and how close it is to the wave peak
                         const waveIntensity = Math.cos((dist - r.radius) / r.width * Math.PI / 2);
-                        // Multiplier tweaked: Was 0.01, now 0.002 for MICRO subtle effect
-                        force.mult(r.amplitude * 0.002 * waveIntensity);
+                        const forceMag = r.amplitude * 0.002 * waveIntensity;
 
-                        a.vel.add(force);
-
-                        // Spin it too!
-                        // a.angle += 0.1; // If we had rotation velocity...
+                        a.vel.x += Math.cos(angle) * forceMag;
+                        a.vel.y += Math.sin(angle) * forceMag;
                     }
                 }
             }
-
-            if (r.amplitude < 0.1 || r.radius > Math.max(this.width, this.height)) {
-                this.ripples.splice(i, 1);
-            }
         }
+        this.ripples = this.ripples.filter(r => r.amplitude >= 0.1 && r.radius <= Math.max(this.width, this.height));
 
         if (this.state !== 'PLAYING') return;
 
         // --- PLAYING STATE ---
 
-        if (this.state === 'PLAYING') { // Check PLAYING state for intensity
-            let baseIntensity = Math.min(1, (this.level - 1) * 0.1); // +10% per level
-
-            // Boost intensity during chaos (lots of asteroids or visual shake)
-            if (this.shake > 5) baseIntensity += 0.2;
-            if (this.asteroids.length > 15) baseIntensity += 0.1;
-
-            this.audio.setMusicIntensity(baseIntensity);
-        }
-
-        // --- PLAYING STATE ---
+        let baseIntensity = Math.min(1, (this.level - 1) * 0.1); // +10% per level
+        if (this.shake > 5) baseIntensity += 0.2;
+        if (this.asteroids.length > 15) baseIntensity += 0.1;
+        this.audio.setMusicIntensity(baseIntensity);
 
         // Update Ship
         if (!this.ship.isDead) {
@@ -600,22 +576,17 @@ export class Game {
                 TelemetryService.logEvent('panic_spin', { rotation: 360 });
             }
 
-            // 4. Camping Detection (Stay within 100px of center)
-            const center = new Vector2(this.width / 2, this.height / 2);
-            const distFromCenter = Math.hypot(this.ship.pos.x - center.x, this.ship.pos.y - center.y);
+            // 4. Camping Detection (Stay within 150px of center)
+            const distFromCenter = Math.hypot(this.ship.pos.x - this.width / 2, this.ship.pos.y - this.height / 2);
             if (distFromCenter < 150) {
                 this.campingTimer += dt;
-                if (this.campingTimer > 5 && Math.floor(this.campingTimer) % 5 === 0) { // Log every 5s
-                    // Only log once per threshold to avoid spam? 
-                    // For now just accumulate total time
-                }
+                this.stats.timeCamping += dt;
             } else {
                 if (this.campingTimer > 10) {
                     TelemetryService.logEvent('camping', { duration: Math.floor(this.campingTimer) });
                 }
                 this.campingTimer = 0;
             }
-            this.stats.timeCamping += (distFromCenter < 150 ? dt : 0);
 
             // 5. Close Calls (in Collision Loop)
         }
@@ -623,7 +594,6 @@ export class Game {
         // Update Entities
         this.bullets.forEach(b => b.update(this.width, this.height));
         this.asteroids.forEach(a => a.update(this.width, this.height));
-        this.particles.forEach(p => p.update(this.width, this.height));
 
         // Update Cow
         if (this.cow) {
@@ -681,25 +651,6 @@ export class Game {
     }
 
     checkCollisions() {
-        // Bullet vs Asteroid
-        // Update Background (Parallax)
-        if (this.ship && !this.ship.isDead) {
-            this.gridOffset.x -= this.ship.vel.x * 0.5;
-            this.gridOffset.y -= this.ship.vel.y * 0.5;
-
-            // Move stars
-            this.stars.forEach(star => {
-                star.x -= this.ship.vel.x * star.speed;
-                star.y -= this.ship.vel.y * star.speed;
-
-                // Wrap stars
-                if (star.x < 0) star.x += this.width;
-                if (star.x > this.width) star.x -= this.width;
-                if (star.y < 0) star.y += this.height;
-                if (star.y > this.height) star.y -= this.height;
-            });
-        }
-        this.shake *= 0.9; // Decay shake
 
         // Collision Detection
         for (let i = this.bullets.length - 1; i >= 0; i--) {
@@ -867,6 +818,7 @@ export class Game {
 
                         ctx.restore();
                     };
+                    p._customDraw = true;
                     this.particles.push(p);
                 }
 
@@ -989,14 +941,17 @@ export class Game {
 
         // Push asteroids away from center to prevent instant death spawn kill (safety)
         this.asteroids.forEach(a => {
-            if (Vector2.distance(a.pos, this.ship.pos) < 200) {
-                a.pos.add(new Vector2((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200));
+            if (Math.hypot(a.pos.x - this.ship.pos.x, a.pos.y - this.ship.pos.y) < 200) {
+                a.pos.x += (Math.random() - 0.5) * 200;
+                a.pos.y += (Math.random() - 0.5) * 200;
             }
         });
     }
 
     breakAsteroid(asteroid, index) {
-        this.asteroids.splice(index, 1);
+        // Swap-and-pop: O(1) removal instead of O(n) splice
+        this.asteroids[index] = this.asteroids[this.asteroids.length - 1];
+        this.asteroids.pop();
         const newPieces = asteroid.break();
         this.asteroids.push(...newPieces);
 
@@ -1122,7 +1077,7 @@ export class Game {
 
         if (this.state === 'PLAYING' || this.state === 'GAMEOVER') {
             this.bullets.forEach(b => b.draw(this.ctx));
-            this.particles.forEach(p => p.draw(this.ctx));
+            Particle.batchDraw(this.particles, this.ctx);
             this.asteroids.forEach(a => a.draw(this.ctx));
             if (this.ship && !this.ship.isDead) this.ship.draw(this.ctx);
             if (this.cow) this.cow.draw(this.ctx);

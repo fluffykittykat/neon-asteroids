@@ -44,25 +44,23 @@ export class Ship extends Entity {
                 console.error("Audio error:", e);
             }
 
-            const force = new Vector2(Math.cos(this.angle), Math.sin(this.angle));
+            const cosA = Math.cos(this.angle);
+            const sinA = Math.sin(this.angle);
+            const force = new Vector2(cosA, sinA);
             force.mult(0.1); // Thrust power
             this.applyForce(force);
 
             // Thrust particles
             for (let i = 0; i < 2; i++) {
-                const px = this.pos.x - Math.cos(this.angle) * this.radius;
-                const py = this.pos.y - Math.sin(this.angle) * this.radius;
+                const px = this.pos.x - cosA * this.radius;
+                const py = this.pos.y - sinA * this.radius;
                 const p = new Particle(px, py, '#ff00ff');
 
                 // Shoot particle opposite to thrust
-                const pVel = new Vector2(-Math.cos(this.angle), -Math.sin(this.angle));
-                pVel.mult(Math.random() * 2 + 1);
-
-                // Add spread
-                const spread = new Vector2((Math.random() - 0.5), (Math.random() - 0.5));
-                pVel.add(spread);
-
-                p.vel = pVel;
+                const vx = -cosA * (Math.random() * 2 + 1) + (Math.random() - 0.5);
+                const vy = -sinA * (Math.random() * 2 + 1) + (Math.random() - 0.5);
+                p.vel.x = vx;
+                p.vel.y = vy;
 
                 if (particles) particles.push(p);
             }
