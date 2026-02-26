@@ -162,16 +162,6 @@ export class TouchControls {
 
         ctx.save();
 
-        // --- Zone Divider (faint vertical line) ---
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([10, 10]);
-        ctx.beginPath();
-        ctx.moveTo(this.width / 2, this.height * 0.6);
-        ctx.lineTo(this.width / 2, this.height);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
         const knobSize = 28 * (this.maxRadius / 70);
 
         // --- Joystick Area (Left) ---
