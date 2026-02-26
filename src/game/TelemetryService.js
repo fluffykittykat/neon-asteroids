@@ -172,7 +172,7 @@ export const TelemetryService = {
         if (!db || !userId) return;
 
         // Only backfill once per user
-        const key = `lb_backfilled_${userId}`;
+        const key = `lb_backfilled_v2_${userId}`;
         if (localStorage.getItem(key)) return;
 
         try {
