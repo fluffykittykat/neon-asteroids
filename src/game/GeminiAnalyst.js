@@ -205,7 +205,7 @@ export class GeminiAnalyst {
 
             // Priority List (cheapest first)
             const candidates = [
-                'models/gemini-2.0-flash-lite',
+                'models/gemini-2.0-flash',
                 'models/gemini-2.5-flash',
                 'models/gemini-flash-latest'
             ];
