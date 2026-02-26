@@ -1,4 +1,4 @@
-import { getFirestore, collection, addDoc, doc, setDoc, query, orderBy, limit, getDocs, updateDoc, arrayUnion } from "firebase/firestore";
+import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, orderBy, limit, getDocs, updateDoc, arrayUnion, where } from "firebase/firestore";
 import { app } from "./AuthService.js";
 
 let db;
@@ -69,7 +69,10 @@ export const TelemetryService = {
             const gamesRef = collection(userRef, "games");
             await addDoc(gamesRef, gameData);
             console.log("Telemetry Saved to Firestore!", userRef.id);
-            // alert("Flight Log Saved to Database!"); // VISIBLE FEEDBACK - Removed per user request
+
+            // Also save to global leaderboard
+            TelemetryService.saveToLeaderboard(userId, score, level, stats);
+
             return userRef.id; // Return ID for auto-open
         } catch (e) {
             console.error("Failed to save telemetry:", e);
@@ -159,6 +162,79 @@ export const TelemetryService = {
             console.log("User Profile Updated in Firestore:", profileData.displayName);
         } catch (e) {
             console.error("Failed to update user profile:", e);
+        }
+    },
+
+    saveToLeaderboard: async (userId, score, level, stats) => {
+        if (!db || !userId) return;
+        try {
+            // Get user profile for display name and photo
+            const userRef = doc(db, "users", userId);
+            const userSnap = await getDoc(userRef);
+            const userData = userSnap.exists() ? userSnap.data() : {};
+
+            await addDoc(collection(db, "leaderboard"), {
+                uid: userId,
+                displayName: userData.displayName || 'Anonymous Pilot',
+                photoURL: userData.photoURL || null,
+                score: score,
+                level: level,
+                accuracy: stats.shotsFired > 0 ? Math.round((stats.hits / stats.shotsFired) * 100) : 0,
+                timestamp: Date.now()
+            });
+            console.log("Leaderboard entry saved!");
+        } catch (e) {
+            console.warn("Failed to save leaderboard entry:", e);
+        }
+    },
+
+    getLeaderboard: async () => {
+        if (!db) return [];
+        try {
+            const q = query(
+                collection(db, "leaderboard"),
+                orderBy("score", "desc"),
+                limit(10)
+            );
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(d => d.data());
+        } catch (e) {
+            console.warn("Failed to fetch leaderboard:", e);
+            return [];
+        }
+    },
+
+    getGlobalStats: async () => {
+        if (!db) return null;
+        try {
+            // Fetch top 100 recent scores for aggregate stats
+            const q = query(
+                collection(db, "leaderboard"),
+                orderBy("score", "desc"),
+                limit(100)
+            );
+            const snapshot = await getDocs(q);
+            const entries = snapshot.docs.map(d => d.data());
+
+            if (entries.length === 0) return null;
+
+            const scores = entries.map(e => e.score);
+            const accuracies = entries.map(e => e.accuracy || 0);
+            const uniquePlayers = new Set(entries.map(e => e.uid)).size;
+
+            return {
+                totalGames: entries.length,
+                uniquePlayers: uniquePlayers,
+                topScore: scores[0],
+                topPlayerName: entries[0].displayName,
+                avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+                medianScore: scores[Math.floor(scores.length / 2)],
+                avgAccuracy: Math.round(accuracies.reduce((a, b) => a + b, 0) / accuracies.length),
+                scores: scores // For percentile calculation
+            };
+        } catch (e) {
+            console.warn("Failed to fetch global stats:", e);
+            return null;
         }
     }
 };

@@ -76,6 +76,17 @@ export class GeminiAnalyst {
             }
         })();
 
+        // 2b. Kick off Global Stats Fetch (Async)
+        const globalPromise = (async () => {
+            try {
+                const { TelemetryService } = await import('./TelemetryService.js');
+                return await TelemetryService.getGlobalStats();
+            } catch (e) {
+                console.warn("Global stats fetch failed:", e);
+                return null;
+            }
+        })();
+
         // 3. Await History and Build Context
         let historyContext = "No prior records found.";
         try {
@@ -107,6 +118,30 @@ export class GeminiAnalyst {
         const stats = log.stats || {};
         const missionDate = new Date(log.timestamp);
 
+        // 4b. Build Global Ranking Context
+        let globalContext = "Global data unavailable.";
+        try {
+            const globalStats = await globalPromise;
+            if (globalStats) {
+                // Calculate percentile
+                const rank = globalStats.scores.filter(s => s > log.score).length + 1;
+                const percentile = Math.round((1 - rank / globalStats.totalGames) * 100);
+
+                globalContext = `
+              GLOBAL RANKINGS (across all pilots):
+              - This pilot's score: ${log.score} (Rank #${rank} of ${globalStats.totalGames} total games)
+              - Top ${percentile}% of all pilots
+              - Global Top Score: ${globalStats.topScore} by "${globalStats.topPlayerName}"
+              - Global Average Score: ${globalStats.avgScore}
+              - Global Median Score: ${globalStats.medianScore}
+              - Global Average Accuracy: ${globalStats.avgAccuracy}%
+              - Total Unique Pilots: ${globalStats.uniquePlayers}
+              `;
+            }
+        } catch (e) {
+            console.warn("Global context build failed:", e);
+        }
+
         const prompt = `
         You are the ship's AI computer for "Prograde Sun".
         
@@ -129,6 +164,8 @@ export class GeminiAnalyst {
         
         HISTORICAL CONTEXT:
         ${historyContext}
+
+        ${globalContext}
         
         RECENT EVENTS (JSON):
         ${telemetrySummary}
@@ -140,7 +177,8 @@ export class GeminiAnalyst {
         2. **Content Restrictions**: You ONLY discuss game stats, performance, and piloting ability. 
            - If the user asks about ANYTHING unrelated to the game (weather, personal questions, other topics, jokes, etc.), give a brief sassy dismissal like "I'm a flight computer, not your therapist. Ask me about your terrible accuracy instead." or "That's outside my operational parameters. Let's talk about those ${stats.panicSpins || 0} panic spins instead."
         3. **Personalize**: Use the pilot's name ("${userName || "Pilot"}") if it makes the roast sting more.
-        4. **Formatting**:
+        4. **Global Comparison**: When global rankings are available, ALWAYS mention how this pilot compares to others. Mention their rank, percentile, or how far they are from the top. Make it competitive and motivating (or humiliating).
+        5. **Formatting**:
            - **Length**: 5 to 8 sentences for game-related questions. 1-2 sentences for off-topic dismissals.
            - **Style**: Short, punchy sentences. No fluff or rambling.
            - **Requirement**: You MUST mention at least one specific stat (accuracy, score, aliens killed, etc.) to prove you're paying attention.
@@ -292,8 +330,8 @@ export class GeminiAnalyst {
 • By Color: ${colorBreakdown}
 `;
 
-        // Get the sassy summary from AI
-        const sassyResponse = await this.ask("Give me a harsh, sarcastic summary of this mission performance. Mention the most embarrassing stat.", log, userId, userName);
+        // Get the sassy summary from AI (now includes global comparison via ask())
+        const sassyResponse = await this.ask("Give me a harsh, sarcastic summary of this mission performance. Compare me against other pilots globally. Mention my rank and the most embarrassing stat.", log, userId, userName);
 
         // Combine stats + sassy response
         return statsList + "\n" + sassyResponse;

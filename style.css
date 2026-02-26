@@ -85,6 +85,92 @@ body {
   transition: opacity 0.3s ease;
 }
 
+/* --- LEADERBOARD STYLES --- */
+.leaderboard {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(0, 243, 255, 0.2);
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.leaderboard h3 {
+  font-size: 16px;
+  color: var(--neon-green);
+  text-shadow: 0 0 8px var(--neon-green);
+  margin: 0 0 10px 0;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.leaderboard ol {
+  list-style: none;
+  counter-reset: rank;
+  padding: 0;
+  margin: 0;
+}
+
+.leaderboard li {
+  counter-increment: rank;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: 13px;
+  color: #aaa;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s;
+}
+
+.leaderboard li::before {
+  content: "#" counter(rank);
+  color: var(--neon-blue);
+  font-weight: bold;
+  min-width: 30px;
+}
+
+.leaderboard li.lb-loading {
+  justify-content: center;
+  color: #666;
+  font-style: italic;
+}
+
+.leaderboard li.lb-loading::before {
+  content: "";
+  min-width: 0;
+}
+
+.leaderboard li.lb-you {
+  color: var(--neon-pink);
+  text-shadow: 0 0 6px var(--neon-pink);
+  background: rgba(255, 0, 255, 0.08);
+}
+
+.leaderboard li:first-child {
+  color: var(--neon-green);
+  text-shadow: 0 0 6px var(--neon-green);
+  font-size: 14px;
+}
+
+.leaderboard .lb-name {
+  flex: 1;
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard .lb-score {
+  font-weight: bold;
+  color: var(--neon-blue);
+  margin-left: 10px;
+}
+
+.leaderboard li.lb-you .lb-score {
+  color: var(--neon-pink);
+}
+
 /* --- DASHBOARD STYLES --- */
 #dashboard-overlay {
   position: absolute;

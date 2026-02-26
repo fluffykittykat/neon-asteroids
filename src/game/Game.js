@@ -286,6 +286,9 @@ export class Game {
     start() {
         this.initLevel();
 
+        // Fetch leaderboard on start
+        this.fetchAndRenderLeaderboard();
+
         // Require a click to ensure audio context and focus
         const startAction = (e) => {
             if (!this.user) return; // REQUIRE LOGIN
@@ -1046,6 +1049,9 @@ export class Game {
         this.ads.showBottomBanner();
         this.uiFinalScore.innerText = this.score;
         this.updateUI();
+
+        // Refresh leaderboard on game over
+        this.fetchAndRenderLeaderboard();
     }
 
     createRipple(pos, maxRadius, amplitude) {
@@ -1065,6 +1071,45 @@ export class Game {
         this.uiScore.innerText = this.score;
         if (this.uiHighScore) this.uiHighScore.innerText = this.highScore;
         if (this.uiLives) this.uiLives.innerText = this.lives;
+    }
+
+    async fetchAndRenderLeaderboard() {
+        try {
+            const data = await TelemetryService.getLeaderboard();
+            const currentUid = this.user ? this.user.uid : null;
+            this.renderLeaderboard(data, 'leaderboard-list', currentUid);
+            this.renderLeaderboard(data, 'leaderboard-gameover-list', currentUid);
+        } catch (e) {
+            console.warn('Leaderboard fetch failed:', e);
+        }
+    }
+
+    renderLeaderboard(data, elementId, currentUid) {
+        const ol = document.getElementById(elementId);
+        if (!ol) return;
+        ol.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            ol.innerHTML = '<li class="lb-loading">No scores yet. Be the first!</li>';
+            return;
+        }
+
+        data.forEach(entry => {
+            const li = document.createElement('li');
+            if (entry.uid === currentUid) li.classList.add('lb-you');
+
+            const name = document.createElement('span');
+            name.className = 'lb-name';
+            name.textContent = entry.displayName || 'Anonymous';
+
+            const score = document.createElement('span');
+            score.className = 'lb-score';
+            score.textContent = entry.score.toLocaleString();
+
+            li.appendChild(name);
+            li.appendChild(score);
+            ol.appendChild(li);
+        });
     }
 
     getDistortion(x, y) {
