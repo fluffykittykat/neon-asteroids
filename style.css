@@ -59,7 +59,7 @@ body {
 #score-board,
 #high-score-board,
 #lives-board {
-  font-size: 24px;
+  font-size: clamp(14px, 2.5vw, 24px);
   color: var(--neon-blue);
   text-shadow: 0 0 10px var(--neon-blue);
 }
@@ -405,6 +405,13 @@ p {
 }
 
 @media (max-width: 768px) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
   h1 {
     font-size: 36px;
     margin-bottom: 15px;
@@ -414,13 +421,44 @@ p {
     font-size: 18px;
   }
 
+  /* Hide desktop controls hint on mobile */
+  .controls {
+    display: none !important;
+  }
+
+  /* Show mobile prompt */
+  #mobile-start-prompt {
+    display: block !important;
+  }
+
+  #mobile-restart-prompt {
+    display: block !important;
+  }
+
+  #restart-prompt {
+    display: none !important;
+  }
+
   #start-screen,
   #game-over-screen {
     width: 85%;
     max-width: 400px;
     padding: 25px;
     box-sizing: border-box;
-    /* Ensure padding doesn't overflow width */
+  }
+
+  /* Compact HUD top bar */
+  #hud-top {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .small-btn {
+    padding: 8px 12px;
+    font-size: 12px;
   }
 
   /* Profile Actions: Wrap buttons on small screens */
@@ -430,8 +468,7 @@ p {
   }
 
   /* Make buttons full width and finger-friendly */
-  .retro-btn,
-  .small-btn {
+  .retro-btn {
     width: 100%;
     margin-top: 10px;
     padding: 15px;
@@ -441,7 +478,7 @@ p {
 
   .profile-actions .small-btn {
     margin: 5px 0;
-    /* Vertical stacking */
+    width: 100%;
   }
 
   #dashboard-window {
@@ -474,9 +511,7 @@ p {
 
   #send-chat-btn {
     height: 60px;
-    /* Big send button */
     width: auto;
-    /* Keep intrinsic width or specific width */
     min-width: 80px;
   }
 }

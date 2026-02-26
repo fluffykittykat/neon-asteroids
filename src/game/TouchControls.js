@@ -9,13 +9,12 @@ export class TouchControls {
         this.joyBase = null; // {x, y}
         this.joyTouchId = null;
         this.joyStick = null; // {x, y} relative to base
-        this.maxRadius = 50;
+        this.maxRadius = 70;
 
         // Fire Button (Right)
         this.fireTouchId = null;
-        this.fireBtnPos = { x: width - 80, y: height - 80 };
-        this.fireBtnRadius = 40;
-        this.fireBtnRadius = 40;
+        this.fireBtnPos = { x: width - 100, y: height - 100 };
+        this.fireBtnRadius = 55;
         this.isFiring = false;
 
         this.active = false; // Only active during gameplay
@@ -146,10 +145,10 @@ export class TouchControls {
         // we need to scale up the UI elements so they remain physically touchable.
         const uiScale = w / window.innerWidth;
 
-        this.maxRadius = 50 * uiScale;
-        this.fireBtnRadius = 40 * uiScale;
+        this.maxRadius = 70 * uiScale;
+        this.fireBtnRadius = 55 * uiScale;
 
-        this.margin = 80 * uiScale;
+        this.margin = 100 * uiScale;
 
         this.fireBtnPos = { x: this.width - this.margin, y: this.height - this.margin };
     }
@@ -163,39 +162,66 @@ export class TouchControls {
 
         ctx.save();
 
+        // --- Zone Divider (faint vertical line) ---
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([10, 10]);
+        ctx.beginPath();
+        ctx.moveTo(this.width / 2, this.height * 0.6);
+        ctx.lineTo(this.width / 2, this.height);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const knobSize = 28 * (this.maxRadius / 70);
+
         // --- Joystick Area (Left) ---
         if (this.joyBase) {
             // Dragging: Show Base and Stick
             ctx.strokeStyle = 'rgba(0, 243, 255, 0.5)';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
 
             // Base
             ctx.beginPath();
             ctx.arc(this.joyBase.x, this.joyBase.y, this.maxRadius, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Stick
+            // Stick knob
             ctx.fillStyle = 'rgba(0, 243, 255, 0.8)';
             ctx.beginPath();
-            ctx.arc(this.joyBase.x + this.joyStick.x, this.joyBase.y + this.joyStick.y, 20 * (this.maxRadius / 50), 0, Math.PI * 2);
+            ctx.arc(this.joyBase.x + this.joyStick.x, this.joyBase.y + this.joyStick.y, knobSize, 0, Math.PI * 2);
             ctx.fill();
         } else {
-            // Idle: Show faint hint area
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            // Idle: Show hint area
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.2)';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(this.margin, this.height - this.margin, this.maxRadius, 0, Math.PI * 2);
             ctx.stroke();
+
+            // MOVE label
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.25)';
+            ctx.font = `${Math.round(14 * (this.maxRadius / 70))}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('MOVE', this.margin, this.height - this.margin);
         }
 
         // --- Fire Button (Right) ---
+        // Outer ring glow
+        ctx.strokeStyle = this.isFiring ? 'rgba(255, 0, 100, 0.6)' : 'rgba(255, 0, 100, 0.15)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(this.fireBtnPos.x, this.fireBtnPos.y, this.fireBtnRadius + 5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Fill
         ctx.fillStyle = this.isFiring ? 'rgba(255, 0, 100, 0.8)' : 'rgba(255, 0, 100, 0.3)';
         ctx.beginPath();
         ctx.arc(this.fireBtnPos.x, this.fireBtnPos.y, this.fireBtnRadius, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = '16px monospace';
+        ctx.font = `${Math.round(22 * (this.fireBtnRadius / 55))}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('FIRE', this.fireBtnPos.x, this.fireBtnPos.y);

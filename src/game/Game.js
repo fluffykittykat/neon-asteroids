@@ -24,6 +24,9 @@ export class Game {
 
         // Define and Run Resize Logic
         const resize = () => {
+            const oldW = this.width || 0;
+            const oldH = this.height || 0;
+
             const maxW = 2560;
             const minW = this.isMobile ? 900 : 0; // Moderate Zoom Out on mobile
 
@@ -35,6 +38,21 @@ export class Game {
             this.height = this.canvas.height = targetW * (window.innerHeight / window.innerWidth);
 
             if (this.touchControls) this.touchControls.resize(this.width, this.height);
+
+            // Rescale stars to new dimensions
+            if (this.stars && oldW > 0 && oldH > 0) {
+                const scaleX = this.width / oldW;
+                const scaleY = this.height / oldH;
+                for (let i = 0; i < this.stars.length; i++) {
+                    this.stars[i].x *= scaleX;
+                    this.stars[i].y *= scaleY;
+                }
+            }
+
+            // Regenerate planets for new viewport
+            if (this.planets) {
+                this.generatePlanets();
+            }
         };
 
         resize(); // Set initial dimensions before systems init
@@ -128,6 +146,18 @@ export class Game {
         this.btnLogout = document.getElementById('logout-btn');
         this.startPrompt = document.getElementById('start-prompt');
         this.user = null;
+
+        // Swap prompts for mobile
+        if (this.isMobile) {
+            const desktopPrompt = document.getElementById('start-prompt');
+            const mobilePrompt = document.getElementById('mobile-start-prompt');
+            const restartPrompt = document.getElementById('restart-prompt');
+            const mobileRestart = document.getElementById('mobile-restart-prompt');
+            if (desktopPrompt) desktopPrompt.style.display = 'none';
+            if (mobilePrompt) mobilePrompt.style.display = 'block';
+            if (restartPrompt) restartPrompt.style.display = 'none';
+            if (mobileRestart) mobileRestart.style.display = 'block';
+        }
 
         this.setupAuth();
         this.updateUI();
