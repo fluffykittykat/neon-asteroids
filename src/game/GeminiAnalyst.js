@@ -203,9 +203,9 @@ export class GeminiAnalyst {
             const modelNames = data.models.map(m => m.name);
             console.log("Available Models:", modelNames);
 
-            // Priority List (cheapest first)
+            // Priority List (cheapest first — confirmed from ai.google.dev/gemini-api/docs/models)
             const candidates = [
-                'models/gemini-2.0-flash',
+                'models/gemini-2.5-flash-lite',
                 'models/gemini-2.5-flash',
                 'models/gemini-flash-latest'
             ];
