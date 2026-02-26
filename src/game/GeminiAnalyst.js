@@ -203,11 +203,11 @@ export class GeminiAnalyst {
             const modelNames = data.models.map(m => m.name);
             console.log("Available Models:", modelNames);
 
-            // Priority List
+            // Priority List (cheapest first)
             const candidates = [
+                'models/gemini-2.0-flash-lite',
                 'models/gemini-2.5-flash',
-                'models/gemini-flash-latest',
-                'models/gemini-2.0-flash-lite'
+                'models/gemini-flash-latest'
             ];
 
             // return the first match found in available models
