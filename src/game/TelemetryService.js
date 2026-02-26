@@ -269,17 +269,50 @@ export const TelemetryService = {
 
             const scores = entries.map(e => e.score);
             const accuracies = entries.map(e => e.accuracy || 0);
-            const uniquePlayers = new Set(entries.map(e => e.uid)).size;
+
+            // Build per-player profiles
+            const playerMap = {};
+            entries.forEach(e => {
+                const uid = e.uid;
+                if (!playerMap[uid]) {
+                    playerMap[uid] = {
+                        name: e.displayName || 'Anonymous',
+                        uid: uid,
+                        scores: [],
+                        accuracies: [],
+                        bestScore: 0,
+                        bestLevel: 0
+                    };
+                }
+                playerMap[uid].scores.push(e.score);
+                playerMap[uid].accuracies.push(e.accuracy || 0);
+                if (e.score > playerMap[uid].bestScore) {
+                    playerMap[uid].bestScore = e.score;
+                    playerMap[uid].bestLevel = e.level || 1;
+                }
+            });
+
+            // Convert to sorted array of player profiles
+            const playerProfiles = Object.values(playerMap).map(p => ({
+                name: p.name,
+                uid: p.uid,
+                gamesPlayed: p.scores.length,
+                bestScore: p.bestScore,
+                bestLevel: p.bestLevel,
+                avgScore: Math.round(p.scores.reduce((a, b) => a + b, 0) / p.scores.length),
+                avgAccuracy: Math.round(p.accuracies.reduce((a, b) => a + b, 0) / p.accuracies.length)
+            })).sort((a, b) => b.bestScore - a.bestScore);
 
             return {
                 totalGames: entries.length,
-                uniquePlayers: uniquePlayers,
+                uniquePlayers: playerProfiles.length,
                 topScore: scores[0],
                 topPlayerName: entries[0].displayName,
                 avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
                 medianScore: scores[Math.floor(scores.length / 2)],
                 avgAccuracy: Math.round(accuracies.reduce((a, b) => a + b, 0) / accuracies.length),
-                scores: scores // For percentile calculation
+                scores: scores,
+                playerProfiles: playerProfiles // Individual player breakdowns
             };
         } catch (e) {
             console.warn("Failed to fetch global stats:", e);

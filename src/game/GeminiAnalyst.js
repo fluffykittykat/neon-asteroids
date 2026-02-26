@@ -127,15 +127,32 @@ export class GeminiAnalyst {
                 const rank = globalStats.scores.filter(s => s > log.score).length + 1;
                 const percentile = Math.round((1 - rank / globalStats.totalGames) * 100);
 
+                // Build per-player roster (exclude current user for comparison)
+                const otherPilots = globalStats.playerProfiles || [];
+                const pilotRoster = otherPilots.slice(0, 10).map((p, i) =>
+                    `  ${i + 1}. "${p.name}" — Best: ${p.bestScore}, Avg: ${p.avgScore}, Accuracy: ${p.avgAccuracy}%, Games: ${p.gamesPlayed}, Best Level: ${p.bestLevel}`
+                ).join('\n');
+
+                // Find current player's profile in the roster
+                const currentProfile = otherPilots.find(p => p.uid === userId);
+                const currentProfileStr = currentProfile
+                    ? `Current Pilot's Profile: Best: ${currentProfile.bestScore}, Avg: ${currentProfile.avgScore}, Accuracy: ${currentProfile.avgAccuracy}%, Games: ${currentProfile.gamesPlayed}`
+                    : 'Current Pilot: New player (no historical profile)';
+
                 globalContext = `
               GLOBAL RANKINGS (across all pilots):
-              - This pilot's score: ${log.score} (Rank #${rank} of ${globalStats.totalGames} total games)
+              - This mission's score: ${log.score} (Rank #${rank} of ${globalStats.totalGames} total games)
               - Top ${percentile}% of all pilots
               - Global Top Score: ${globalStats.topScore} by "${globalStats.topPlayerName}"
               - Global Average Score: ${globalStats.avgScore}
               - Global Median Score: ${globalStats.medianScore}
               - Global Average Accuracy: ${globalStats.avgAccuracy}%
               - Total Unique Pilots: ${globalStats.uniquePlayers}
+
+              ${currentProfileStr}
+
+              PILOT ROSTER (all known pilots, ranked by best score):
+${pilotRoster}
               `;
             }
         } catch (e) {
@@ -162,7 +179,7 @@ export class GeminiAnalyst {
         - Alien Shots Survived: ${stats.alienShotsDodged || 0} (Hits: ${stats.alienHitsTaken || 0})
         - Asteroid Colors Hit: ${JSON.stringify(stats.asteroidColorMap || {})}
         
-        HISTORICAL CONTEXT:
+        HISTORICAL CONTEXT (this pilot's own past games):
         ${historyContext}
 
         ${globalContext}
@@ -177,11 +194,11 @@ export class GeminiAnalyst {
         2. **Content Restrictions**: You ONLY discuss game stats, performance, and piloting ability. 
            - If the user asks about ANYTHING unrelated to the game (weather, personal questions, other topics, jokes, etc.), give a brief sassy dismissal like "I'm a flight computer, not your therapist. Ask me about your terrible accuracy instead." or "That's outside my operational parameters. Let's talk about those ${stats.panicSpins || 0} panic spins instead."
         3. **Personalize**: Use the pilot's name ("${userName || "Pilot"}") if it makes the roast sting more.
-        4. **Global Comparison**: When global rankings are available, ALWAYS mention how this pilot compares to others. Mention their rank, percentile, or how far they are from the top. Make it competitive and motivating (or humiliating).
+        4. **Player Comparisons**: You have the PILOT ROSTER with stats for every known pilot. ALWAYS compare the current pilot against specific other players BY NAME. Examples: "While you scored ${log.score}, [OtherPilot] averages [X] — that's [better/worse] than your lifetime average." or "[OtherPilot] has ${stats.panicSpins || 0 > 3 ? 'fewer' : 'more'} panic spins than you." Make it personal, competitive, and specific. Reference both the pilot's own history AND other players.
         5. **Formatting**:
            - **Length**: 5 to 8 sentences for game-related questions. 1-2 sentences for off-topic dismissals.
            - **Style**: Short, punchy sentences. No fluff or rambling.
-           - **Requirement**: You MUST mention at least one specific stat (accuracy, score, aliens killed, etc.) to prove you're paying attention.
+           - **Requirement**: You MUST mention at least one specific stat AND at least one other pilot by name to prove you know the competition.
            - No bullet points in follow-up responses. Just one sharp paragraph.
         `;
 
