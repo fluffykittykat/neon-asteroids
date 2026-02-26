@@ -268,8 +268,11 @@ export class Game {
                 this.startPrompt.classList.remove('hidden');
                 this.startPrompt.style.display = 'block';
 
-                // Save User Profile to DB
+                // Save User Profile to DB (also triggers leaderboard backfill)
                 TelemetryService.updateUserProfile(user);
+
+                // Refresh leaderboard after backfill has time to complete
+                setTimeout(() => this.fetchAndRenderLeaderboard(), 3000);
             } else {
                 // Logged Out
                 this.btnLogin.style.display = 'inline-block';

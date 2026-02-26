@@ -160,8 +160,57 @@ export const TelemetryService = {
 
             await setDoc(userRef, profileData, { merge: true });
             console.log("User Profile Updated in Firestore:", profileData.displayName);
+
+            // Trigger one-time leaderboard backfill for this user
+            TelemetryService.backfillLeaderboard(user.uid, profileData.displayName, profileData.photoURL);
         } catch (e) {
             console.error("Failed to update user profile:", e);
+        }
+    },
+
+    backfillLeaderboard: async (userId, displayName, photoURL) => {
+        if (!db || !userId) return;
+
+        // Only backfill once per user
+        const key = `lb_backfilled_${userId}`;
+        if (localStorage.getItem(key)) return;
+
+        try {
+            console.log("Backfilling leaderboard for user:", userId);
+            const userRef = doc(db, "users", userId);
+            const gamesRef = collection(userRef, "games");
+            const q = query(gamesRef, orderBy("timestamp", "desc"), limit(50));
+            const snapshot = await getDocs(q);
+
+            if (snapshot.empty) {
+                localStorage.setItem(key, '1');
+                return;
+            }
+
+            let count = 0;
+            for (const gameDoc of snapshot.docs) {
+                const g = gameDoc.data();
+                if (g.test || !g.score) continue; // Skip test entries
+
+                const stats = g.stats || {};
+                const accuracy = stats.shotsFired > 0 ? Math.round((stats.hits / stats.shotsFired) * 100) : 0;
+
+                await addDoc(collection(db, "leaderboard"), {
+                    uid: userId,
+                    displayName: displayName || 'Anonymous Pilot',
+                    photoURL: photoURL || null,
+                    score: g.score,
+                    level: g.level || 1,
+                    accuracy: accuracy,
+                    timestamp: g.timestamp || Date.now()
+                });
+                count++;
+            }
+
+            localStorage.setItem(key, '1');
+            console.log(`Backfilled ${count} leaderboard entries for ${displayName}`);
+        } catch (e) {
+            console.warn("Leaderboard backfill failed:", e);
         }
     },
 
