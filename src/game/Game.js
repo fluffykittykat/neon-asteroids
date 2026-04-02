@@ -15,7 +15,6 @@ import { Renderer } from './Renderer.js';
 
 export class Game {
     constructor(canvas) {
-        console.log("NEON ASTEROIDS v3.0 - ALIEN FIX");
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
 
@@ -97,7 +96,18 @@ export class Game {
         this.ui.updateUI(this.score, this.highScore, this.lives);
 
         // Audio unlock
-        const unlockAudio = () => { if (this.audio) this.audio.resume(); };
+        const unlockAudio = () => {
+            if (this.audio) {
+                this.audio.resume();
+                // Remove listeners after first successful unlock
+                if (this.audio.ctx && this.audio.ctx.state === 'running') {
+                    window.removeEventListener('click', unlockAudio);
+                    window.removeEventListener('touchstart', unlockAudio);
+                    window.removeEventListener('touchend', unlockAudio);
+                    window.removeEventListener('keydown', unlockAudio);
+                }
+            }
+        };
         window.addEventListener('click', unlockAudio);
         window.addEventListener('touchstart', unlockAudio, { passive: true });
         window.addEventListener('touchend', unlockAudio, { passive: true });

@@ -1,5 +1,4 @@
 import { Vector2 } from './Vector2.js';
-import { Particle } from './entities/Particle.js';
 import { TelemetryService } from './TelemetryService.js';
 
 export class CollisionSystem {
