@@ -14,6 +14,38 @@ export class Particle extends Entity {
         this._customDraw = false; // Flag for particles with overridden draw (e.g. mini-cows)
     }
 
+    reset(x, y, color) {
+        this.pos = new Vector2(x, y);
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 2 + 1;
+        this.vel = new Vector2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+        this.acc = new Vector2(0, 0);
+        this.color = color || '#ff00ff';
+        this.glowColor = '#fff';
+        this.life = 1.0;
+        this.decay = Math.random() * 0.03 + 0.015;
+        this.radius = Math.random() * 3 + 1;
+        this.angle = 0;
+        this.isDead = false;
+        this._customDraw = false;
+        this.draw = Particle.prototype.draw; // Reset to default draw
+    }
+
+    static _pool = [];
+
+    static acquire(x, y, color) {
+        if (Particle._pool.length > 0) {
+            const p = Particle._pool.pop();
+            p.reset(x, y, color);
+            return p;
+        }
+        return new Particle(x, y, color);
+    }
+
+    static release(particle) {
+        Particle._pool.push(particle);
+    }
+
     update(width, height) {
         this.pos.add(this.vel);
         this.life -= this.decay;

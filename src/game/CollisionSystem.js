@@ -136,8 +136,10 @@ export class CollisionSystem {
 
         // Check Close Calls (Ship vs Asteroids) - Independent of bullets
         if (ship && !ship.isDead && !ship.isInvulnerable) { // Only check if vulnerable
-            asteroids.forEach(a => {
-                const dist = Math.hypot(ship.pos.x - a.pos.x, ship.pos.y - a.pos.y);
+            for (let i = 0; i < asteroids.length; i++) { const a = asteroids[i];
+                const dx = ship.pos.x - a.pos.x;
+                const dy = ship.pos.y - a.pos.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
                 const safeDist = a.radius + ship.radius + 40; // 40px margin
                 const dangerDist = a.radius + ship.radius + 5;
 
@@ -149,7 +151,7 @@ export class CollisionSystem {
                         a.hadCloseCall = true; // Flag to prevent spamming close call on same asteroid
                     }
                 }
-            });
+            }
 
             // Ship vs Asteroid (Actual Collision)
             for (const a of asteroids) {
@@ -171,15 +173,15 @@ export class CollisionSystem {
             for (let j = i + 1; j < asteroids.length; j++) {
                 const a2 = asteroids[j];
 
-                const dist = Vector2.distance(a1.pos, a2.pos);
+                const dx = a2.pos.x - a1.pos.x;
+                const dy = a2.pos.y - a1.pos.y;
                 const minDist = a1.radius + a2.radius;
+                if (Math.abs(dx) > minDist || Math.abs(dy) > minDist) continue;
+                const dist = Math.sqrt(dx * dx + dy * dy);
 
                 if (dist < minDist) {
                     // 1. Resolve Overlap (Push apart)
                     const overlap = minDist - dist;
-                    // Normal vector from a1 to a2
-                    const dx = a2.pos.x - a1.pos.x;
-                    const dy = a2.pos.y - a1.pos.y;
 
                     // Avoid div by zero
                     if (dist === 0) continue;

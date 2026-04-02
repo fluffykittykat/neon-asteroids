@@ -13,6 +13,7 @@ export class TouchControls {
         this.isFiring = false;
 
         this.active = false;
+        this._rafPending = false;
 
         // Cached rect/scale — updated in resize(), not per-event
         this._rect = null;
@@ -80,29 +81,42 @@ export class TouchControls {
         if (!this.active) return;
         e.preventDefault();
 
+        if (this._rafPending) return;
+        this._rafPending = true;
+
+        // Capture touch data now — e.changedTouches may not survive past the event handler
+        const touchData = [];
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
-
-            if (t.identifier === this.joyTouchId && this.joyBase) {
-                const { cx, cy } = this._toCanvas(t);
-                const dx = cx - this.joyBase.x;
-                const dy = cy - this.joyBase.y;
-                const dist = Math.hypot(dx, dy);
-                const clamped = Math.min(dist, this.maxRadius);
-                const angle = Math.atan2(dy, dx);
-
-                this.joyStick = {
-                    x: Math.cos(angle) * clamped,
-                    y: Math.sin(angle) * clamped
-                };
-                this.updateInput();
-            }
-
-            if (t.identifier === this.fireTouchId) {
-                const { cx, cy } = this._toCanvas(t);
-                this.firePos = { x: cx, y: cy };
-            }
+            touchData.push({ clientX: t.clientX, clientY: t.clientY, identifier: t.identifier });
         }
+
+        requestAnimationFrame(() => {
+            this._rafPending = false;
+            for (let i = 0; i < touchData.length; i++) {
+                const t = touchData[i];
+
+                if (t.identifier === this.joyTouchId && this.joyBase) {
+                    const { cx, cy } = this._toCanvas(t);
+                    const dx = cx - this.joyBase.x;
+                    const dy = cy - this.joyBase.y;
+                    const dist = Math.hypot(dx, dy);
+                    const clamped = Math.min(dist, this.maxRadius);
+                    const angle = Math.atan2(dy, dx);
+
+                    this.joyStick = {
+                        x: Math.cos(angle) * clamped,
+                        y: Math.sin(angle) * clamped
+                    };
+                    this.updateInput();
+                }
+
+                if (t.identifier === this.fireTouchId) {
+                    const { cx, cy } = this._toCanvas(t);
+                    this.firePos = { x: cx, y: cy };
+                }
+            }
+        });
     }
 
     _handleEnd(e) {

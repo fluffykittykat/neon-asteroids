@@ -12,7 +12,8 @@ export class BackgroundFX {
         this.ripples = [];
 
         // Generate Starfield
-        for (let i = 0; i < 150; i++) {
+        const starCount = this.isMobile ? 80 : 150;
+        for (let i = 0; i < starCount; i++) {
             this.stars.push({
                 x: Math.random() * this.width,
                 y: Math.random() * this.height,
@@ -104,8 +105,8 @@ export class BackgroundFX {
             if (el.y > this.height + 200) el.y -= this.height + 400;
         };
 
-        this.stars.forEach(s => updateBg(s, s.speed));
-        this.planets.forEach(p => updateBg(p, p.speed));
+        for (let i = 0; i < this.stars.length; i++) { const s = this.stars[i]; updateBg(s, s.speed); }
+        for (let i = 0; i < this.planets.length; i++) { const p = this.planets[i]; updateBg(p, p.speed); }
 
         // Update Ripples
         for (let i = 0; i < this.ripples.length; i++) {
@@ -128,7 +129,8 @@ export class BackgroundFX {
                 }
             }
         }
-        this.ripples = this.ripples.filter(r => r.amplitude >= 0.1 && r.radius <= Math.max(this.width, this.height));
+        const maxDim = Math.max(this.width, this.height);
+        this.ripples = this.ripples.filter(r => r.amplitude >= 0.1 && r.radius <= maxDim);
     }
 
     draw(ctx) {
@@ -144,7 +146,7 @@ export class BackgroundFX {
             ctx.fill();
 
             // Rings
-            if (p.hasRings) {
+            if (p.hasRings && !this.isMobile) {
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 1;
                 ctx.globalAlpha = 0.1;
