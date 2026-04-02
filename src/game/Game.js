@@ -95,19 +95,8 @@ export class Game {
         });
         this.ui.updateUI(this.score, this.highScore, this.lives);
 
-        // Audio unlock
-        const unlockAudio = () => {
-            if (this.audio) {
-                this.audio.resume();
-                // Remove listeners after first successful unlock
-                if (this.audio.ctx && this.audio.ctx.state === 'running') {
-                    window.removeEventListener('click', unlockAudio);
-                    window.removeEventListener('touchstart', unlockAudio);
-                    window.removeEventListener('touchend', unlockAudio);
-                    window.removeEventListener('keydown', unlockAudio);
-                }
-            }
-        };
+        // Audio unlock — keep listeners alive on iOS (context can re-suspend)
+        const unlockAudio = () => { if (this.audio) this.audio.resume(); };
         window.addEventListener('click', unlockAudio);
         window.addEventListener('touchstart', unlockAudio, { passive: true });
         window.addEventListener('touchend', unlockAudio, { passive: true });

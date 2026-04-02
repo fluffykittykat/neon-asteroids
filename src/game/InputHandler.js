@@ -37,7 +37,7 @@ export class InputHandler {
         if (this.isDown('ArrowUp') || this.isDown('KeyW')) return true;
         // Joystick Y-axis (Pushing UP means Y < 0 usually, but let's say Up on stick)
         // If joystick.y is -1 (up), we thrust
-        if (this.joystick && this.joystick.y < -0.3) return true;
+        if (this.joystick && this.joystick.y < -0.15) return true;
         return false;
     }
 

@@ -29,7 +29,7 @@ export class Ship extends Entity {
         // Rotation (Only if not blocked)
         const rot = isDashboardBlocked ? 0 : input.getRotation();
         if (rot !== 0) {
-            this.rotation = rot * 0.05; // Scale rotation speed
+            this.rotation = rot * 0.08; // Faster rotation for responsive mobile feel
         } else {
             this.rotation = 0;
         }
@@ -47,7 +47,7 @@ export class Ship extends Entity {
             const cosA = Math.cos(this.angle);
             const sinA = Math.sin(this.angle);
             const force = new Vector2(cosA, sinA);
-            force.mult(0.1); // Thrust power
+            force.mult(0.15); // Increased thrust for snappier feel
             this.applyForce(force);
 
             // Thrust particles
