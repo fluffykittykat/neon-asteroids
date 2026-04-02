@@ -1,5 +1,5 @@
 # Stage 1: Build the Bundle
-FROM node:18-slim AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 COPY package.json .
 RUN yarn install
