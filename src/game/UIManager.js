@@ -39,7 +39,6 @@ export class UIManager {
         if (this.btnLogin) {
             this.btnLogin.addEventListener('click', async (e) => {
                 e.stopPropagation(); // Don't start game
-                console.log("LOGIN CLICKED");
                 try {
                     await AuthService.login();
                 } catch (err) {

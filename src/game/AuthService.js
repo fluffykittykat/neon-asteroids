@@ -6,7 +6,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChang
 // Go to Firebase Console -> Project Settings -> General -> Your Apps -> SDK Setup
 // Config from User Screenshot
 const firebaseConfig = {
-    apiKey: "AIzaSyAZVuE5rZRXSXJ7G_wISrfooTGgbp15-dg",
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAZVuE5rZRXSXJ7G_wISrfooTGgbp15-dg",
     authDomain: "astroids-3a3fb.firebaseapp.com",
     projectId: "astroids-3a3fb",
     storageBucket: "astroids-3a3fb.firebasestorage.app",
@@ -59,7 +59,6 @@ export const AuthService = {
         if (!auth) return;
         try {
             await signOut(auth);
-            console.log("User signed out successfully");
 
             // Force page reload to clear any cached state
             // This ensures a clean slate for the next login
