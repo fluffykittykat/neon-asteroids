@@ -213,7 +213,16 @@ export class Game {
 
         // Particles (always update)
         for (let i = 0; i < this.particles.length; i++) this.particles[i].update(this.width, this.height);
-        this.particles = this.particles.filter(p => !p.isDead);
+        // Swap-pop dead particles back to pool
+        let writeIdx0 = 0;
+        for (let i = 0; i < this.particles.length; i++) {
+            if (this.particles[i].isDead) {
+                Particle.release(this.particles[i]);
+            } else {
+                this.particles[writeIdx0++] = this.particles[i];
+            }
+        }
+        this.particles.length = writeIdx0;
 
         // Background FX
         this.backgroundFX.update(dt, this.ship, this.asteroids, this.state);
@@ -253,8 +262,8 @@ export class Game {
         }
 
         // Entity updates
-        this.bullets.forEach(b => b.update(this.width, this.height));
-        this.asteroids.forEach(a => a.update(this.width, this.height));
+        for (let i = 0; i < this.bullets.length; i++) this.bullets[i].update(this.width, this.height);
+        for (let i = 0; i < this.asteroids.length; i++) this.asteroids[i].update(this.width, this.height);
 
         // Spawn management
         this.cow = this.spawnManager.updateCow(this.cow, this.width, this.height, this.audio);
@@ -267,7 +276,16 @@ export class Game {
 
         // Cleanup
         this.bullets = this.bullets.filter(b => !b.isDead);
-        this.particles = this.particles.filter(p => !p.isDead);
+        // Swap-pop dead particles back to pool
+        let writeIdx1 = 0;
+        for (let i = 0; i < this.particles.length; i++) {
+            if (this.particles[i].isDead) {
+                Particle.release(this.particles[i]);
+            } else {
+                this.particles[writeIdx1++] = this.particles[i];
+            }
+        }
+        this.particles.length = writeIdx1;
 
         // Collisions
         this.collisionSystem.checkCollisions({
@@ -341,7 +359,7 @@ export class Game {
     createExplosion(pos, color, count) {
         const realCount = Math.floor(count * 0.8);
         for (let i = 0; i < realCount; i++) {
-            const p = new Particle(pos.x, pos.y, color);
+            const p = Particle.acquire(pos.x, pos.y, color);
             p.vel.mult(Math.random() * 3 + 2);
             p.radius = Math.random() * 3 + 1;
             this.particles.push(p);
@@ -349,12 +367,13 @@ export class Game {
         for (let i = 0; i < 20; i++) {
             const angle = (Math.PI * 2 / 20) * i;
             const speed = 8;
-            const p = new Particle(pos.x, pos.y, color);
+            const p = Particle.acquire(pos.x, pos.y, color);
             p.vel = new Vector2(Math.cos(angle) * speed, Math.sin(angle) * speed);
             p.decay = 0.05;
             this.particles.push(p);
         }
-        if (this.particles.length > 300) this.particles.splice(0, this.particles.length - 300);
+        const maxParticles = this.isMobile ? 200 : 300;
+        if (this.particles.length > maxParticles) this.particles.splice(0, this.particles.length - maxParticles);
     }
 
     playerHit() {
@@ -374,12 +393,12 @@ export class Game {
         this.ship.angle = -Math.PI / 2;
         this.ship.invulnerable = 180;
         this.backgroundFX.createRipple(this.ship.pos, 150, 10, this.audio);
-        this.asteroids.forEach(a => {
+        for (let i = 0; i < this.asteroids.length; i++) { const a = this.asteroids[i];
             if (Math.hypot(a.pos.x - this.ship.pos.x, a.pos.y - this.ship.pos.y) < 200) {
                 a.pos.x += (Math.random() - 0.5) * 200;
                 a.pos.y += (Math.random() - 0.5) * 200;
             }
-        });
+        }
     }
 
     gameOver() {
