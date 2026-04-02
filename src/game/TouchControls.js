@@ -193,8 +193,6 @@ export class TouchControls {
     draw(ctx) {
         ctx.save();
 
-        const halfW = this.width / 2;
-
         // ---- LEFT ZONE: Move ----
         if (this.joyBase && this.joyStick) {
             // Active joystick
@@ -216,9 +214,6 @@ export class TouchControls {
             );
             ctx.fillStyle = 'rgba(0, 243, 255, 0.8)';
             ctx.fill();
-        } else {
-            // Idle — zone indicator on left half
-            this._drawZoneIndicator(ctx, 0, 0, halfW, this.height, 'MOVE', 'rgba(0, 243, 255, 0.15)');
         }
 
         // ---- RIGHT ZONE: Fire ----
@@ -231,40 +226,9 @@ export class TouchControls {
             ctx.strokeStyle = 'rgba(255, 0, 100, 0.6)';
             ctx.lineWidth = 3;
             ctx.stroke();
-        } else {
-            // Idle — zone indicator on right half
-            this._drawZoneIndicator(ctx, halfW, 0, halfW, this.height, 'FIRE', 'rgba(255, 0, 100, 0.15)');
         }
 
         ctx.restore();
     }
 
-    /**
-     * Draw a subtle zone indicator: dashed border on the inner edge + centered label.
-     */
-    _drawZoneIndicator(ctx, x, y, w, h, label, color) {
-        ctx.save();
-
-        // Dashed vertical divider on the zone's inner boundary
-        ctx.setLineDash([12 * this.uiScale, 8 * this.uiScale]);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        // For left zone, inner edge is right side (x + w). For right zone, inner edge is left side (x).
-        const dividerX = (x === 0) ? x + w : x;
-        ctx.moveTo(dividerX, y);
-        ctx.lineTo(dividerX, y + h);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Label centered in the zone
-        const fontSize = Math.round(20 * this.uiScale);
-        ctx.fillStyle = color;
-        ctx.font = `${fontSize}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, x + w / 2, y + h / 2);
-
-        ctx.restore();
-    }
 }
