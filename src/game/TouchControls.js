@@ -1,24 +1,25 @@
-import { Vector2 } from './Vector2.js';
-
 export class TouchControls {
     constructor(inputHandler, width, height) {
         this.input = inputHandler;
-        this.resize(width, height);
 
-        // Joystick (Left)
-        this.joyBase = null; // {x, y}
+        // Joystick state (left zone)
         this.joyTouchId = null;
-        this.joyStick = null; // {x, y} relative to base
-        this.maxRadius = 70;
+        this.joyBase = null;   // {x, y} in canvas coords — appears where finger touches
+        this.joyStick = null;  // {x, y} offset from base, clamped
 
-        // Fire Button (Right)
+        // Fire state (right zone)
         this.fireTouchId = null;
-        this.fireBtnPos = { x: width - 100, y: height - 100 };
-        this.fireBtnRadius = 55;
+        this.firePos = null;   // {x, y} in canvas coords — feedback circle position
         this.isFiring = false;
 
-        this.active = false; // Only active during gameplay
+        this.active = false;
 
+        // Cached rect/scale — updated in resize(), not per-event
+        this._rect = null;
+        this._scaleX = 1;
+        this._scaleY = 1;
+
+        this.resize(width, height);
         this.setupListeners();
     }
 
@@ -26,91 +27,88 @@ export class TouchControls {
         this.active = isActive;
         if (!isActive) {
             this.joyTouchId = null;
+            this.joyBase = null;
+            this.joyStick = null;
             this.fireTouchId = null;
+            this.firePos = null;
+            this.isFiring = false;
             this.input.setJoystick(0, 0);
             this.input.setFire(false);
         }
     }
 
     setupListeners() {
-        // Prevent default touch actions (scrolling/zooming)
-        window.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
-        window.addEventListener('touchmove', (e) => this.handleMove(e), { passive: false });
-        window.addEventListener('touchend', (e) => this.handleEnd(e), { passive: false });
+        window.addEventListener('touchstart', (e) => this._handleStart(e), { passive: false });
+        window.addEventListener('touchmove', (e) => this._handleMove(e), { passive: false });
+        window.addEventListener('touchend', (e) => this._handleEnd(e), { passive: false });
+        window.addEventListener('touchcancel', (e) => this._handleEnd(e), { passive: false });
+
+        // Re-cache rect on resize/scroll
+        window.addEventListener('resize', () => this._cacheRect());
+        window.addEventListener('scroll', () => this._cacheRect(), { passive: true });
     }
 
-    handleStart(e) {
+    // --- Touch handlers ---------------------------------------------------
+
+    _handleStart(e) {
         if (!this.active) return;
         e.preventDefault();
 
-        // Calculate Scale Factor (Canvas Pixels per Window Pixel)
-        // We assume the canvas fills the window visually.
-        const rect = e.target.getBoundingClientRect();
-        const scaleX = e.target.width / rect.width;
-        const scaleY = e.target.height / rect.height;
-
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
-            // Map Touch to Canvas Coordinates
-            const x = (t.clientX - rect.left) * scaleX;
-            const y = (t.clientY - rect.top) * scaleY;
+            const { cx, cy } = this._toCanvas(t);
 
-            // Logic: Left half of SCREEN (not canvas) is joystick
-            // t.clientX is screen coordinate
             if (t.clientX < window.innerWidth / 2) {
+                // Left half — joystick
                 if (this.joyTouchId === null) {
                     this.joyTouchId = t.identifier;
-                    this.joyBase = { x, y };
+                    this.joyBase = { x: cx, y: cy };
                     this.joyStick = { x: 0, y: 0 };
                     this.updateInput();
                 }
-            }
-            // Right side = Fire
-            else {
-                this.isFiring = true;
+            } else {
+                // Right half — fire
                 this.fireTouchId = t.identifier;
-                // Update Fire Button Position to be under finger?
-                // For now, let's just trigger fire.
+                this.firePos = { x: cx, y: cy };
+                this.isFiring = true;
                 this.input.setFire(true);
             }
         }
     }
 
-    handleMove(e) {
+    _handleMove(e) {
         if (!this.active) return;
         e.preventDefault();
-
-        const rect = e.target.getBoundingClientRect();
-        const scaleX = e.target.width / rect.width;
-        const scaleY = e.target.height / rect.height;
 
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
 
-            if (t.identifier === this.joyTouchId) {
-                const x = (t.clientX - rect.left) * scaleX;
-                const y = (t.clientY - rect.top) * scaleY;
-
-                const dx = x - this.joyBase.x;
-                const dy = y - this.joyBase.y;
+            if (t.identifier === this.joyTouchId && this.joyBase) {
+                const { cx, cy } = this._toCanvas(t);
+                const dx = cx - this.joyBase.x;
+                const dy = cy - this.joyBase.y;
                 const dist = Math.hypot(dx, dy);
+                const clamped = Math.min(dist, this.maxRadius);
                 const angle = Math.atan2(dy, dx);
 
-                // Clamp stick
-                const clampedDist = Math.min(dist, this.maxRadius);
                 this.joyStick = {
-                    x: Math.cos(angle) * clampedDist,
-                    y: Math.sin(angle) * clampedDist
+                    x: Math.cos(angle) * clamped,
+                    y: Math.sin(angle) * clamped
                 };
-
                 this.updateInput();
+            }
+
+            if (t.identifier === this.fireTouchId) {
+                const { cx, cy } = this._toCanvas(t);
+                this.firePos = { x: cx, y: cy };
             }
         }
     }
 
-    handleEnd(e) {
+    _handleEnd(e) {
         if (!this.active) return;
         e.preventDefault();
+
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
 
@@ -123,98 +121,135 @@ export class TouchControls {
 
             if (t.identifier === this.fireTouchId) {
                 this.fireTouchId = null;
+                this.firePos = null;
                 this.isFiring = false;
                 this.input.setFire(false);
             }
         }
     }
 
+    // --- Coordinate helpers -----------------------------------------------
+
+    _toCanvas(touch) {
+        return {
+            cx: (touch.clientX - this._rect.left) * this._scaleX,
+            cy: (touch.clientY - this._rect.top) * this._scaleY
+        };
+    }
+
+    _cacheRect() {
+        const canvas = document.querySelector('canvas');
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        this._rect = rect;
+        this._scaleX = canvas.width / rect.width;
+        this._scaleY = canvas.height / rect.height;
+    }
+
+    // --- Input normalization ----------------------------------------------
+
     updateInput() {
-        // Normalize stick to -1..1
+        if (!this.joyStick) return;
         const nx = this.joyStick.x / this.maxRadius;
         const ny = this.joyStick.y / this.maxRadius;
         this.input.setJoystick(nx, ny);
     }
 
+    // --- Resize -----------------------------------------------------------
+
     resize(w, h) {
         this.width = w;
         this.height = h;
 
-        // Dynamic UI Scaling
-        // If the game resolution is much larger than the screen (e.g. on mobile with virtual resolution),
-        // we need to scale up the UI elements so they remain physically touchable.
+        // uiScale: canvas pixels per CSS pixel
         const uiScale = w / window.innerWidth;
+        this.uiScale = uiScale;
 
-        this.maxRadius = 70 * uiScale;
-        this.fireBtnRadius = 55 * uiScale;
+        // 50% larger sizes
+        this.maxRadius = 105 * uiScale;
+        this.knobRadius = 42 * uiScale;
+        this.fireFeedbackRadius = 80 * uiScale;
 
-        this.margin = 100 * uiScale;
-
-        this.fireBtnPos = { x: this.width - this.margin, y: this.height - this.margin };
+        // Re-cache rect & scale
+        this._cacheRect();
     }
 
+    // --- Drawing ----------------------------------------------------------
+
     draw(ctx) {
-        // Only draw if touch is supported or active
-        // Simplest check: just always draw generic UI hints if desired, 
-        // but for "Virtual Joystick" we usually show it only when active OR show static placeholders.
-
-        // Let's draw static placeholders that light up.
-
         ctx.save();
 
-        const knobSize = 28 * (this.maxRadius / 70);
+        const halfW = this.width / 2;
 
-        // --- Joystick Area (Left) ---
-        if (this.joyBase) {
-            // Dragging: Show Base and Stick
-            ctx.strokeStyle = 'rgba(0, 243, 255, 0.5)';
-            ctx.lineWidth = 3;
-
-            // Base
+        // ---- LEFT ZONE: Move ----
+        if (this.joyBase && this.joyStick) {
+            // Active joystick
+            // Base circle
             ctx.beginPath();
             ctx.arc(this.joyBase.x, this.joyBase.y, this.maxRadius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.12)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.5)';
+            ctx.lineWidth = 3;
             ctx.stroke();
 
-            // Stick knob
-            ctx.fillStyle = 'rgba(0, 243, 255, 0.8)';
+            // Knob
             ctx.beginPath();
-            ctx.arc(this.joyBase.x + this.joyStick.x, this.joyBase.y + this.joyStick.y, knobSize, 0, Math.PI * 2);
+            ctx.arc(
+                this.joyBase.x + this.joyStick.x,
+                this.joyBase.y + this.joyStick.y,
+                this.knobRadius, 0, Math.PI * 2
+            );
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.8)';
             ctx.fill();
         } else {
-            // Idle: Show hint area
-            ctx.strokeStyle = 'rgba(0, 243, 255, 0.2)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(this.margin, this.height - this.margin, this.maxRadius, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // MOVE label
-            ctx.fillStyle = 'rgba(0, 243, 255, 0.25)';
-            ctx.font = `${Math.round(14 * (this.maxRadius / 70))}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('MOVE', this.margin, this.height - this.margin);
+            // Idle — zone indicator on left half
+            this._drawZoneIndicator(ctx, 0, 0, halfW, this.height, 'MOVE', 'rgba(0, 243, 255, 0.15)');
         }
 
-        // --- Fire Button (Right) ---
-        // Outer ring glow
-        ctx.strokeStyle = this.isFiring ? 'rgba(255, 0, 100, 0.6)' : 'rgba(255, 0, 100, 0.15)';
-        ctx.lineWidth = 3;
+        // ---- RIGHT ZONE: Fire ----
+        if (this.isFiring && this.firePos) {
+            // Feedback circle at touch point
+            ctx.beginPath();
+            ctx.arc(this.firePos.x, this.firePos.y, this.fireFeedbackRadius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 0, 100, 0.25)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 0, 100, 0.6)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        } else {
+            // Idle — zone indicator on right half
+            this._drawZoneIndicator(ctx, halfW, 0, halfW, this.height, 'FIRE', 'rgba(255, 0, 100, 0.15)');
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * Draw a subtle zone indicator: dashed border on the inner edge + centered label.
+     */
+    _drawZoneIndicator(ctx, x, y, w, h, label, color) {
+        ctx.save();
+
+        // Dashed vertical divider on the zone's inner boundary
+        ctx.setLineDash([12 * this.uiScale, 8 * this.uiScale]);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(this.fireBtnPos.x, this.fireBtnPos.y, this.fireBtnRadius + 5, 0, Math.PI * 2);
+        // For left zone, inner edge is right side (x + w). For right zone, inner edge is left side (x).
+        const dividerX = (x === 0) ? x + w : x;
+        ctx.moveTo(dividerX, y);
+        ctx.lineTo(dividerX, y + h);
         ctx.stroke();
+        ctx.setLineDash([]);
 
-        // Fill
-        ctx.fillStyle = this.isFiring ? 'rgba(255, 0, 100, 0.8)' : 'rgba(255, 0, 100, 0.3)';
-        ctx.beginPath();
-        ctx.arc(this.fireBtnPos.x, this.fireBtnPos.y, this.fireBtnRadius, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `${Math.round(22 * (this.fireBtnRadius / 55))}px monospace`;
+        // Label centered in the zone
+        const fontSize = Math.round(20 * this.uiScale);
+        ctx.fillStyle = color;
+        ctx.font = `${fontSize}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('FIRE', this.fireBtnPos.x, this.fireBtnPos.y);
+        ctx.fillText(label, x + w / 2, y + h / 2);
 
         ctx.restore();
     }

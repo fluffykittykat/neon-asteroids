@@ -492,10 +492,7 @@ p {
 
 @media (max-width: 768px) {
   body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    padding: 0;
   }
 
   h1 {
@@ -531,11 +528,12 @@ p {
     max-width: 400px;
     padding: 25px;
     box-sizing: border-box;
+    margin-top: env(safe-area-inset-top);
   }
 
   /* Compact HUD top bar */
   #hud-top {
-    top: 10px;
+    top: max(10px, env(safe-area-inset-top));
     left: 10px;
     right: 10px;
     gap: 5px;
@@ -543,8 +541,10 @@ p {
   }
 
   .small-btn {
-    padding: 8px 12px;
-    font-size: 12px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 14px;
   }
 
   /* Profile Actions: Wrap buttons on small screens */
@@ -570,7 +570,7 @@ p {
   #dashboard-window {
     width: 95%;
     height: 90%;
-    padding: 10px;
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
     display: flex;
     flex-direction: column;
   }
